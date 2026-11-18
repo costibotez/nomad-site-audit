@@ -1,16 +1,19 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+// The plugin keeps its own tables (apps, tokens, activity log, backups), which WordPress has no API for.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 /**
  * Database tables: registered apps, tokens, activity log and file backups.
  */
-class NSA_DB {
+class NomadSA_DB {
 
 	const SCHEMA_VERSION = '1';
 
 	public static function table( $name ) {
 		global $wpdb;
-		return $wpdb->prefix . 'nsa_' . $name;
+		return $wpdb->prefix . 'nomadsa_' . $name;
 	}
 
 	public static function install() {
@@ -67,13 +70,39 @@ class NSA_DB {
 			PRIMARY KEY  (id)
 		) $charset;" );
 
-		update_option( 'nsa_schema_version', self::SCHEMA_VERSION, false );
+		update_option( 'nomadsa_schema_version', self::SCHEMA_VERSION, false );
 	}
 
 	public static function maybe_upgrade() {
-		if ( get_option( 'nsa_schema_version' ) !== self::SCHEMA_VERSION ) {
+		if ( get_option( 'nomadsa_schema_version' ) !== self::SCHEMA_VERSION ) {
 			self::install();
 		}
+		if ( false !== get_option( 'nsa_schema_version' ) ) {
+			self::migrate_from_nsa();
+		}
+	}
+
+	/** Versions before 1.1.0 used the nsa prefix. Copy their data across so connections keep working. */
+	private static function migrate_from_nsa() {
+		global $wpdb;
+		foreach ( array( 'clients', 'tokens', 'log', 'backups' ) as $t ) {
+			$old = $wpdb->prefix . 'nsa_' . $t;
+			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old ) ) ) {
+				continue;
+			}
+			// The new tables have exactly the same columns as the old ones.
+			$wpdb->query( $wpdb->prepare( 'INSERT INTO %i SELECT * FROM %i', self::table( $t ), $old ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange -- removes the plugin's own old table after copying.
+			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $old ) );
+		}
+		foreach ( array( 'settings', 'runtime', 'wellknown' ) as $o ) {
+			$value = get_option( 'nsa_' . $o );
+			if ( false !== $value ) {
+				update_option( 'nomadsa_' . $o, $value, 'settings' !== $o );
+			}
+			delete_option( 'nsa_' . $o );
+		}
+		delete_option( 'nsa_schema_version' );
 	}
 
 	public static function now() {
@@ -89,7 +118,7 @@ class NSA_DB {
 		$wpdb->insert( self::table( 'log' ), array(
 			'created_at' => self::now(),
 			'user_id'    => get_current_user_id(),
-			'client_id'  => NSA_OAuth::$current_client,
+			'client_id'  => NomadSA_OAuth::$current_client,
 			'tool'       => $tool,
 			'kind'       => $kind,
 			'status'     => $status,
@@ -97,9 +126,9 @@ class NSA_DB {
 			'args'       => (string) $json,
 		) );
 		// Keep the log to a sensible size.
-		$count = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . self::table( 'log' ) );
+		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', self::table( 'log' ) ) );
 		if ( $count > 5000 ) {
-			$wpdb->query( 'DELETE FROM ' . self::table( 'log' ) . ' ORDER BY id ASC LIMIT ' . ( $count - 5000 ) );
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i ORDER BY id ASC LIMIT %d', self::table( 'log' ), $count - 5000 ) );
 		}
 	}
 
@@ -116,7 +145,7 @@ class NSA_DB {
 
 	public static function get_backup( $id ) {
 		global $wpdb;
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table( 'backups' ) . ' WHERE id = %d', $id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', self::table( 'backups' ), $id ), ARRAY_A );
 		if ( $row ) {
 			$row['content'] = gzuncompress( base64_decode( $row['content'] ) );
 		}
@@ -126,9 +155,10 @@ class NSA_DB {
 	public static function uninstall() {
 		global $wpdb;
 		foreach ( array( 'clients', 'tokens', 'log', 'backups' ) as $t ) {
-			$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table( $t ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables on uninstall.
+			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', self::table( $t ) ) );
 		}
-		foreach ( array( 'nsa_schema_version', 'nsa_settings', 'nsa_runtime' ) as $o ) {
+		foreach ( array( 'nomadsa_schema_version', 'nomadsa_settings', 'nomadsa_runtime', 'nomadsa_wellknown' ) as $o ) {
 			delete_option( $o );
 		}
 	}

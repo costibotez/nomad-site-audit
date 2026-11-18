@@ -4,11 +4,20 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Routes requests for the connector endpoints and provides small response helpers.
  */
-class NSA_HTTP {
+class NomadSA_HTTP {
+
+	/** A sanitised value from $_SERVER. */
+	public static function server( $key, $default = '' ) {
+		return isset( $_SERVER[ $key ] ) ? sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) ) : $default;
+	}
+
+	public static function method() {
+		return strtoupper( self::server( 'REQUEST_METHOD', 'GET' ) );
+	}
 
 	/** Path of the current request relative to the site home, without trailing slash. */
 	public static function request_path() {
-		$path = (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH );
+		$path = (string) wp_parse_url( esc_url_raw( self::server( 'REQUEST_URI', '/' ) ), PHP_URL_PATH );
 		$home = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
 		$home = rtrim( $home, '/' );
 		if ( '' !== $home && 0 === strpos( $path, $home ) ) {
@@ -23,32 +32,32 @@ class NSA_HTTP {
 
 		if ( 0 === strpos( $path, '/.well-known/oauth-protected-resource' ) ) {
 			self::cors();
-			self::json( NSA_OAuth::protected_resource_metadata() );
+			self::json( NomadSA_OAuth::protected_resource_metadata() );
 		}
 		if ( 0 === strpos( $path, '/.well-known/oauth-authorization-server' ) || 0 === strpos( $path, '/.well-known/openid-configuration' ) ) {
 			self::cors();
-			self::json( NSA_OAuth::authorization_server_metadata() );
+			self::json( NomadSA_OAuth::authorization_server_metadata() );
 		}
 
 		switch ( $path ) {
 			case '/nsa-oauth/resource':
 				self::cors();
-				self::json( NSA_OAuth::protected_resource_metadata() );
+				self::json( NomadSA_OAuth::protected_resource_metadata() );
 				exit;
 			case '/nsa-oauth/authorize':
-				NSA_OAuth::authorize();
+				NomadSA_OAuth::authorize();
 				exit;
 			case '/nsa-oauth/token':
 				self::cors();
-				NSA_OAuth::token();
+				NomadSA_OAuth::token();
 				exit;
 			case '/nsa-oauth/register':
 				self::cors();
-				NSA_OAuth::register();
+				NomadSA_OAuth::register();
 				exit;
 			case '/nsa-mcp':
 				self::cors();
-				NSA_MCP::handle();
+				NomadSA_MCP::handle();
 				exit;
 		}
 	}
@@ -60,7 +69,7 @@ class NSA_HTTP {
 			header( 'Access-Control-Allow-Headers: Authorization, Content-Type, Mcp-Protocol-Version, Mcp-Session-Id' );
 			header( 'Access-Control-Expose-Headers: WWW-Authenticate, Mcp-Session-Id' );
 		}
-		if ( 'OPTIONS' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+		if ( 'OPTIONS' === self::method() ) {
 			status_header( 204 );
 			exit;
 		}
@@ -86,8 +95,8 @@ class NSA_HTTP {
 	/** Reads the Bearer token, including from hosts that move the Authorization header. */
 	public static function bearer_token() {
 		$candidates = array(
-			$_SERVER['HTTP_AUTHORIZATION'] ?? '',
-			$_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '',
+			self::server( 'HTTP_AUTHORIZATION' ),
+			self::server( 'REDIRECT_HTTP_AUTHORIZATION' ),
 		);
 		if ( function_exists( 'getallheaders' ) ) {
 			foreach ( (array) getallheaders() as $k => $v ) {
@@ -105,15 +114,19 @@ class NSA_HTTP {
 	}
 
 	public static function body_params() {
-		$type = strtolower( $_SERVER['CONTENT_TYPE'] ?? '' );
+		$type = strtolower( self::server( 'CONTENT_TYPE' ) );
 		$raw  = file_get_contents( 'php://input' );
 		if ( false !== strpos( $type, 'application/json' ) ) {
 			$data = json_decode( (string) $raw, true );
 			return is_array( $data ) ? $data : array();
 		}
+		// OAuth token and registration requests come from Claude's servers, not from a WordPress form,
+		// so there is no nonce; they are authenticated by the authorisation code, PKCE verifier or refresh token.
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
 		if ( ! empty( $_POST ) ) {
-			return wp_unslash( $_POST );
+			return map_deep( wp_unslash( $_POST ), 'sanitize_text_field' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 		parse_str( (string) $raw, $data );
 		return $data;
 	}

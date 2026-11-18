@@ -4,7 +4,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Plugin settings (how the connection behaves) and runtime fixes (what has been applied to the site).
  */
-class NSA_Settings {
+class NomadSA_Settings {
 
 	public static function defaults() {
 		return array(
@@ -20,13 +20,13 @@ class NSA_Settings {
 	}
 
 	public static function get( $key = null ) {
-		$s = wp_parse_args( (array) get_option( 'nsa_settings', array() ), self::defaults() );
+		$s = wp_parse_args( (array) get_option( 'nomadsa_settings', array() ), self::defaults() );
 		return null === $key ? $s : ( $s[ $key ] ?? null );
 	}
 
 	public static function update( array $values ) {
 		$s = array_merge( self::get(), $values );
-		update_option( 'nsa_settings', $s, false );
+		update_option( 'nomadsa_settings', $s, false );
 	}
 
 	public static function runtime_defaults() {
@@ -42,12 +42,12 @@ class NSA_Settings {
 	}
 
 	public static function runtime( $key = null ) {
-		$r = wp_parse_args( (array) get_option( 'nsa_runtime', array() ), self::runtime_defaults() );
+		$r = wp_parse_args( (array) get_option( 'nomadsa_runtime', array() ), self::runtime_defaults() );
 		return null === $key ? $r : ( $r[ $key ] ?? null );
 	}
 
 	public static function update_runtime( array $values ) {
-		update_option( 'nsa_runtime', array_merge( self::runtime(), $values ) );
+		update_option( 'nomadsa_runtime', array_merge( self::runtime(), $values ) );
 	}
 
 	public static function allowed_hosts() {

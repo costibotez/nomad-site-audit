@@ -1,21 +1,24 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+// Queries here use the plugin's own tables or read only counts, which WordPress has no API or cache for.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 /**
  * Read only tools: security, search, health and code inspection.
  */
-class NSA_Audit_Tools {
+class NomadSA_Audit_Tools {
 
 	public static function register() {
 		$c = __CLASS__;
 
-		NSA_Tools::register( 'site_overview', array(
+		NomadSA_Tools::register( 'site_overview', array(
 			'title'       => 'Site overview',
 			'description' => 'Summary of the site: WordPress and PHP versions, server, theme, plugins, pending updates, users, key settings and which security, search, cache and backup plugins are in use. Start here.',
 			'callback'    => array( $c, 'site_overview' ),
 		) );
 
-		NSA_Tools::register( 'list_plugins', array(
+		NomadSA_Tools::register( 'list_plugins', array(
 			'title'       => 'List plugins',
 			'description' => 'All installed plugins with version, active state, available update, WordPress.org status (last updated, closed or abandoned) and known vulnerabilities when a WPScan token is set in the plugin settings.',
 			'properties'  => array(
@@ -24,19 +27,19 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'list_plugins' ),
 		) );
 
-		NSA_Tools::register( 'list_themes', array(
+		NomadSA_Tools::register( 'list_themes', array(
 			'title'       => 'List themes',
 			'description' => 'Installed themes with version, active state, parent theme and available update.',
 			'callback'    => array( $c, 'list_themes' ),
 		) );
 
-		NSA_Tools::register( 'security_audit', array(
+		NomadSA_Tools::register( 'security_audit', array(
 			'title'       => 'Security audit',
 			'description' => 'Runs about 30 security checks (updates, debug settings, exposed files, user enumeration, XML-RPC, security headers, SSL certificate expiry, file permissions, PHP files in uploads, admin accounts and more). Each check returns pass, warning or fail with a plain explanation and the fix tool to use.',
 			'callback'    => array( $c, 'security_audit' ),
 		) );
 
-		NSA_Tools::register( 'scan_for_malware', array(
+		NomadSA_Tools::register( 'scan_for_malware', array(
 			'title'       => 'Scan for malware',
 			'description' => 'Looks for common signs of hacked code: PHP files in uploads, obfuscated code (eval with base64, gzinflate and similar), web shells, very long encoded strings and recently changed PHP files. Findings are leads to review, not proof.',
 			'properties'  => array(
@@ -46,13 +49,13 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'scan_for_malware' ),
 		) );
 
-		NSA_Tools::register( 'verify_core_files', array(
+		NomadSA_Tools::register( 'verify_core_files', array(
 			'title'       => 'Verify WordPress core files',
 			'description' => 'Compares every WordPress core file against the official checksums from WordPress.org to find modified, missing or unexpected files.',
 			'callback'    => array( $c, 'verify_core_files' ),
 		) );
 
-		NSA_Tools::register( 'verify_plugin_files', array(
+		NomadSA_Tools::register( 'verify_plugin_files', array(
 			'title'       => 'Verify plugin files',
 			'description' => 'Compares plugin files against official WordPress.org checksums to find modified or added files. Only works for plugins hosted on WordPress.org.',
 			'properties'  => array(
@@ -61,7 +64,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'verify_plugin_files' ),
 		) );
 
-		NSA_Tools::register( 'seo_audit', array(
+		NomadSA_Tools::register( 'seo_audit', array(
 			'title'       => 'Search optimisation audit',
 			'description' => 'Site level search checks (indexing, sitemap, robots.txt, permalinks, images without alt text) and a per page review of published content: search title and description, noindex, word count, headings, alt text and duplicates. Works with Yoast SEO and Rank Math.',
 			'properties'  => array(
@@ -72,7 +75,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'seo_audit' ),
 		) );
 
-		NSA_Tools::register( 'check_page', array(
+		NomadSA_Tools::register( 'check_page', array(
 			'title'       => 'Check a page',
 			'description' => 'Loads a page of this site like a visitor and reports response time, size, title, meta description, canonical, robots, headings, images, structured data, render blocking scripts, loading screens (preloaders), mixed content and response headers.',
 			'properties'  => array(
@@ -81,7 +84,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'check_page' ),
 		) );
 
-		NSA_Tools::register( 'find_broken_links', array(
+		NomadSA_Tools::register( 'find_broken_links', array(
 			'title'       => 'Find broken links',
 			'description' => 'Collects links and images from published content and checks which ones fail. Internal links by default.',
 			'properties'  => array(
@@ -91,19 +94,19 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'find_broken_links' ),
 		) );
 
-		NSA_Tools::register( 'database_health', array(
+		NomadSA_Tools::register( 'database_health', array(
 			'title'       => 'Database health',
 			'description' => 'Database size, autoloaded options (a common cause of slow sites), revisions, drafts, trash, spam and expired temporary data.',
 			'callback'    => array( $c, 'database_health' ),
 		) );
 
-		NSA_Tools::register( 'list_cron_events', array(
+		NomadSA_Tools::register( 'list_cron_events', array(
 			'title'       => 'Scheduled tasks',
 			'description' => 'WordPress scheduled tasks with next run time and whether any are overdue.',
 			'callback'    => array( $c, 'list_cron_events' ),
 		) );
 
-		NSA_Tools::register( 'read_error_log', array(
+		NomadSA_Tools::register( 'read_error_log', array(
 			'title'       => 'Read error log',
 			'description' => 'Last lines of the WordPress debug log or PHP error log, with secrets removed.',
 			'properties'  => array(
@@ -113,7 +116,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'read_error_log' ),
 		) );
 
-		NSA_Tools::register( 'list_users', array(
+		NomadSA_Tools::register( 'list_users', array(
 			'title'       => 'List users',
 			'description' => 'Users with their roles, registration date and post count. Email addresses are partly hidden. Flags risky usernames.',
 			'properties'  => array(
@@ -122,7 +125,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'list_users' ),
 		) );
 
-		NSA_Tools::register( 'list_content', array(
+		NomadSA_Tools::register( 'list_content', array(
 			'title'       => 'List content',
 			'description' => 'Find posts, pages, media or other content and their IDs, for use with fix tools.',
 			'properties'  => array(
@@ -134,7 +137,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'list_content' ),
 		) );
 
-		NSA_Tools::register( 'list_files', array(
+		NomadSA_Tools::register( 'list_files', array(
 			'title'       => 'List files',
 			'description' => 'Lists a folder inside the WordPress install with sizes, dates and permissions. Protected files such as wp-config.php are hidden.',
 			'properties'  => array(
@@ -144,7 +147,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'list_files' ),
 		) );
 
-		NSA_Tools::register( 'read_file', array(
+		NomadSA_Tools::register( 'read_file', array(
 			'title'       => 'Read file',
 			'description' => 'Reads a text file inside the WordPress install for code review. wp-config.php and other secret files are blocked and secrets are removed from the output.',
 			'properties'  => array(
@@ -156,7 +159,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'read_file' ),
 		) );
 
-		NSA_Tools::register( 'search_code', array(
+		NomadSA_Tools::register( 'search_code', array(
 			'title'       => 'Search code',
 			'description' => 'Searches files for text or a regular expression, for code review or to locate where something is set.',
 			'properties'  => array(
@@ -170,7 +173,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'search_code' ),
 		) );
 
-		NSA_Tools::register( 'get_activity_log', array(
+		NomadSA_Tools::register( 'get_activity_log', array(
 			'title'       => 'Connector activity log',
 			'description' => 'What has been done through this connector: audits, previews and applied fixes.',
 			'properties'  => array(
@@ -180,7 +183,7 @@ class NSA_Audit_Tools {
 			'callback'    => array( $c, 'get_activity_log' ),
 		) );
 
-		NSA_Tools::register( 'list_backups', array(
+		NomadSA_Tools::register( 'list_backups', array(
 			'title'       => 'List change backups',
 			'description' => 'Backups the connector saved before changing files, search titles, alt text, content or settings. Use restore_backup to undo a change.',
 			'properties'  => array( 'limit' => array( 'type' => 'integer', 'description' => 'Default 50.' ) ),
@@ -331,7 +334,7 @@ class NSA_Audit_Tools {
 				'wordpress_latest' => $core_latest ?: $wp_version,
 				'php'              => PHP_VERSION,
 				'database'         => $wpdb->db_server_info(),
-				'server'           => sanitize_text_field( $_SERVER['SERVER_SOFTWARE'] ?? 'unknown' ),
+				'server'           => NomadSA_HTTP::server( 'SERVER_SOFTWARE', 'unknown' ),
 				'memory_limit'     => WP_MEMORY_LIMIT . ' (PHP ' . ini_get( 'memory_limit' ) . ')',
 				'max_upload'       => size_format( wp_max_upload_size() ),
 				'object_cache'     => wp_using_ext_object_cache() ? 'persistent' : 'none',
@@ -358,8 +361,8 @@ class NSA_Audit_Tools {
 			'users'     => $users['avail_roles'],
 			'detected'  => self::detect_stack(),
 			'connector' => array(
-				'version'       => NSA_VERSION,
-				'fixes_allowed' => NSA_OAuth::can_fix(),
+				'version'       => NOMADSA_VERSION,
+				'fixes_allowed' => NomadSA_OAuth::can_fix(),
 			),
 		);
 	}
@@ -371,7 +374,7 @@ class NSA_Audit_Tools {
 		$plugins = get_plugins();
 		$active  = (array) get_option( 'active_plugins', array() );
 		$updates = get_site_transient( 'update_plugins' );
-		$token   = (string) NSA_Settings::get( 'wpscan_token' );
+		$token   = (string) NomadSA_Settings::get( 'wpscan_token' );
 		$out     = array();
 
 		foreach ( $plugins as $file => $data ) {
@@ -408,7 +411,7 @@ class NSA_Audit_Tools {
 	}
 
 	private static function directory_info( $slug ) {
-		$key    = 'nsa_dir_' . md5( $slug );
+		$key    = 'nomadsa_dir_' . md5( $slug );
 		$cached = get_transient( $key );
 		if ( false !== $cached ) {
 			return $cached;
@@ -436,7 +439,7 @@ class NSA_Audit_Tools {
 	}
 
 	private static function wpscan( $type, $slug, $version, $token ) {
-		$key    = 'nsa_wps_' . md5( $type . $slug . $version );
+		$key    = 'nomadsa_wps_' . md5( $type . $slug . $version );
 		$cached = get_transient( $key );
 		if ( false !== $cached ) {
 			return $cached;
@@ -548,8 +551,8 @@ class NSA_Audit_Tools {
 			$log = WP_DEBUG_LOG;
 		}
 		if ( file_exists( $log ) && 0 === strpos( wp_normalize_path( $log ), wp_normalize_path( ABSPATH ) ) ) {
-			$url = home_url( '/' . NSA_Tools::relative( $log ) );
-			list( $res ) = NSA_Tools::fetch( $url, 'HEAD' );
+			$url = home_url( '/' . NomadSA_Tools::relative( $log ) );
+			list( $res ) = NomadSA_Tools::fetch( $url, 'HEAD' );
 			$public  = ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res );
 			$checks[] = $public
 				? self::check( 'debug_log_public', 'fail', 'Error log can be downloaded by anyone', $url . ' is public and can leak paths and data. Block it or move the log outside the web folder.' )
@@ -576,18 +579,18 @@ class NSA_Audit_Tools {
 
 		$uploads = wp_get_upload_dir();
 		$php_in_uploads = self::find_files( $uploads['basedir'], '/\.(php\d?|phtml|phar)$/i', 200 );
-		$guards         = array_filter( $php_in_uploads, array( 'NSA_Tools', 'is_guard_file' ) );
+		$guards         = array_filter( $php_in_uploads, array( 'NomadSA_Tools', 'is_guard_file' ) );
 		$suspicious     = array_diff( $php_in_uploads, $guards );
 		if ( $suspicious ) {
-			$checks[] = self::check( 'php_in_uploads', 'fail', count( $suspicious ) . ' PHP files with code in the uploads folder', 'Uploads should only contain media. Review these, they may be malicious: ' . implode( ', ', array_map( array( 'NSA_Tools', 'relative' ), array_slice( $suspicious, 0, 20 ) ) ), 'read_file' );
+			$checks[] = self::check( 'php_in_uploads', 'fail', count( $suspicious ) . ' PHP files with code in the uploads folder', 'Uploads should only contain media. Review these, they may be malicious: ' . implode( ', ', array_map( array( 'NomadSA_Tools', 'relative' ), array_slice( $suspicious, 0, 20 ) ) ), 'read_file' );
 		} elseif ( $guards ) {
-			$folders  = array_unique( array_map( function ( $f ) { return NSA_Tools::relative( dirname( $f ) ); }, $guards ) );
+			$folders  = array_unique( array_map( function ( $f ) { return NomadSA_Tools::relative( dirname( $f ) ); }, $guards ) );
 			$checks[] = self::check( 'php_in_uploads', 'info', count( $guards ) . ' harmless PHP placeholder or data files in uploads', 'Blank index files or plugin data files that stop immediately, in: ' . implode( ', ', array_slice( $folders, 0, 10 ) ) . '. Leftovers from removed plugins can be cleaned up.', 'delete_uploads_path' );
 		} else {
 			$checks[] = self::check( 'php_in_uploads', 'pass', 'No PHP files in uploads', '' );
 		}
 
-		list( $res ) = NSA_Tools::fetch( $uploads['baseurl'] . '/' );
+		list( $res ) = NomadSA_Tools::fetch( $uploads['baseurl'] . '/' );
 		$listing  = ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res ) && false !== stripos( wp_remote_retrieve_body( $res ), 'Index of' );
 		$checks[] = $listing
 			? self::check( 'directory_listing', 'fail', 'Folder contents can be browsed', $uploads['baseurl'] . '/ lists every file. Ask the host to disable directory listing.' )
@@ -621,7 +624,7 @@ class NSA_Audit_Tools {
 		}
 
 		$enum = false;
-		list( $res ) = NSA_Tools::fetch( rest_url( 'wp/v2/users' ) );
+		list( $res ) = NomadSA_Tools::fetch( rest_url( 'wp/v2/users' ) );
 		if ( ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res ) ) {
 			$list = json_decode( wp_remote_retrieve_body( $res ), true );
 			$enum = is_array( $list ) && ! empty( $list );
@@ -630,9 +633,10 @@ class NSA_Audit_Tools {
 			? self::check( 'user_enumeration', 'warning', 'Usernames can be listed by anyone', rest_url( 'wp/v2/users' ) . ' shows author accounts, which helps password guessing attacks.', 'apply_hardening' )
 			: self::check( 'user_enumeration', 'pass', 'Usernames are not publicly listed', '' );
 
-		$xmlrpc_on = apply_filters( 'xmlrpc_enabled', true ) && ! NSA_Settings::runtime( 'disable_xmlrpc' );
+		$xmlrpc_on = apply_filters( 'xmlrpc_enabled', true ) // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core filter.
+			 && ! NomadSA_Settings::runtime( 'disable_xmlrpc' );
 		if ( $xmlrpc_on ) {
-			list( $res ) = NSA_Tools::fetch( site_url( '/xmlrpc.php' ) );
+			list( $res ) = NomadSA_Tools::fetch( site_url( '/xmlrpc.php' ) );
 			$xmlrpc_on = ! is_wp_error( $res ) && in_array( wp_remote_retrieve_response_code( $res ), array( 200, 405 ), true ) && false !== stripos( wp_remote_retrieve_body( $res ), 'XML-RPC' );
 		}
 		$checks[] = $xmlrpc_on
@@ -640,7 +644,7 @@ class NSA_Audit_Tools {
 			: self::check( 'xmlrpc', 'pass', 'XML-RPC is disabled or blocked', '' );
 
 		// Homepage headers.
-		list( $res, $ms ) = NSA_Tools::fetch( $home );
+		list( $res, $ms ) = NomadSA_Tools::fetch( $home );
 		if ( ! is_wp_error( $res ) ) {
 			$want    = array( 'strict-transport-security', 'x-content-type-options', 'x-frame-options', 'referrer-policy', 'permissions-policy', 'content-security-policy' );
 			$missing = array();
@@ -708,7 +712,7 @@ class NSA_Audit_Tools {
 			return self::check( 'ssl_expiry', 'info', 'SSL certificate not checked', 'Could not connect: ' . $errstr );
 		}
 		$params = stream_context_get_params( $fp );
-		fclose( $fp );
+		fclose( $fp ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closes a network socket, not a file.
 		$cert = openssl_x509_parse( $params['options']['ssl']['peer_certificate'] ?? '' );
 		if ( ! $cert ) {
 			return self::check( 'ssl_expiry', 'info', 'SSL certificate not checked', '' );
@@ -748,11 +752,11 @@ class NSA_Audit_Tools {
 
 	public static function scan_for_malware( $args ) {
 		$rel  = isset( $args['path'] ) ? (string) $args['path'] : 'wp-content';
-		$root = NSA_Tools::resolve_path( $rel );
+		$root = NomadSA_Tools::resolve_path( $rel );
 		if ( is_wp_error( $root ) ) {
 			return $root;
 		}
-		$days     = NSA_Tools::int_arg( $args, 'modified_days', 14, 0, 365 );
+		$days     = NomadSA_Tools::int_arg( $args, 'modified_days', 14, 0, 365 );
 		$patterns = array(
 			'eval_encoded'   => '/\b(eval|assert)\s*\(\s*(base64_decode|gzinflate|gzuncompress|gzdecode|str_rot13|strrev|hex2bin)\s*\(/i',
 			'eval_request'   => '/\b(eval|assert|system|exec|shell_exec|passthru|popen|proc_open)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE|SERVER)/i',
@@ -767,14 +771,14 @@ class NSA_Audit_Tools {
 		$findings = array();
 		$recent   = array();
 		$uploads  = wp_normalize_path( wp_get_upload_dir()['basedir'] );
-		$self_dir = wp_normalize_path( NSA_DIR );
+		$self_dir = wp_normalize_path( NOMADSA_DIR );
 		$scanned  = 0;
 		$cutoff   = time() - $days * DAY_IN_SECONDS;
 
 		$it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $it as $file ) {
 			$path = wp_normalize_path( $file->getPathname() );
-			if ( ! preg_match( '/\.(php\d?|phtml|phar|inc|ico|js)$/i', $path ) || 0 === strpos( $path, $self_dir ) || NSA_Tools::is_sensitive_path( $path ) ) {
+			if ( ! preg_match( '/\.(php\d?|phtml|phar|inc|ico|js)$/i', $path ) || 0 === strpos( $path, $self_dir ) || NomadSA_Tools::is_sensitive_path( $path ) ) {
 				continue;
 			}
 			if ( ++$scanned > 40000 ) {
@@ -782,10 +786,10 @@ class NSA_Audit_Tools {
 			}
 			$is_php = (bool) preg_match( '/\.(php\d?|phtml|phar|inc)$/i', $path );
 			if ( $is_php && $days && $file->getMTime() > $cutoff && count( $recent ) < 100 ) {
-				$recent[] = array( 'file' => NSA_Tools::relative( $path ), 'modified' => gmdate( 'Y-m-d H:i', $file->getMTime() ) );
+				$recent[] = array( 'file' => NomadSA_Tools::relative( $path ), 'modified' => gmdate( 'Y-m-d H:i', $file->getMTime() ) );
 			}
-			if ( $is_php && 0 === strpos( $path, $uploads ) && ! NSA_Tools::is_guard_file( $path ) ) {
-				$findings[] = array( 'file' => NSA_Tools::relative( $path ), 'rule' => 'php_in_uploads', 'line' => null, 'snippet' => '' );
+			if ( $is_php && 0 === strpos( $path, $uploads ) && ! NomadSA_Tools::is_guard_file( $path ) ) {
+				$findings[] = array( 'file' => NomadSA_Tools::relative( $path ), 'rule' => 'php_in_uploads', 'line' => null, 'snippet' => '' );
 			}
 			if ( $file->getSize() > 3 * MB_IN_BYTES ) {
 				continue;
@@ -794,7 +798,7 @@ class NSA_Audit_Tools {
 			if ( 'ico' === $ext ) {
 				$head = (string) file_get_contents( $path, false, null, 0, 200 );
 				if ( false !== stripos( $head, '<?php' ) ) {
-					$findings[] = array( 'file' => NSA_Tools::relative( $path ), 'rule' => 'php_in_image', 'line' => 1, 'snippet' => '' );
+					$findings[] = array( 'file' => NomadSA_Tools::relative( $path ), 'rule' => 'php_in_image', 'line' => 1, 'snippet' => '' );
 				}
 				continue;
 			}
@@ -808,7 +812,7 @@ class NSA_Audit_Tools {
 			foreach ( $lines as $i => $line ) {
 				foreach ( $patterns as $rule => $re ) {
 					if ( preg_match( $re, $line ) ) {
-						$findings[] = array( 'file' => NSA_Tools::relative( $path ), 'rule' => $rule, 'line' => $i + 1, 'snippet' => mb_substr( trim( NSA_Tools::redact( $line ) ), 0, 200 ) );
+						$findings[] = array( 'file' => NomadSA_Tools::relative( $path ), 'rule' => $rule, 'line' => $i + 1, 'snippet' => mb_substr( trim( NomadSA_Tools::redact( $line ) ), 0, 200 ) );
 						break 2;
 					}
 				}
@@ -838,7 +842,7 @@ class NSA_Audit_Tools {
 		}
 		if ( ! is_array( $sums ) ) {
 			$dev = (bool) preg_match( '/-(alpha|beta|RC|src)/i', $wp_version );
-			return new WP_Error( 'nsa_checksums', $dev
+			return new WP_Error( 'nomadsa_checksums', $dev
 				? 'WordPress ' . $wp_version . ' is a test version, so no official checksums exist.'
 				: 'Could not download official checksums from WordPress.org. The server may block outgoing requests.' );
 		}
@@ -951,8 +955,8 @@ class NSA_Audit_Tools {
 
 	public static function seo_audit( $args ) {
 		$types  = ! empty( $args['post_types'] ) && is_array( $args['post_types'] ) ? array_map( 'sanitize_key', $args['post_types'] ) : array( 'page', 'post' );
-		$limit  = NSA_Tools::int_arg( $args, 'limit', 100, 1, 300 );
-		$offset = NSA_Tools::int_arg( $args, 'offset', 0, 0, 100000 );
+		$limit  = NomadSA_Tools::int_arg( $args, 'limit', 100, 1, 300 );
+		$offset = NomadSA_Tools::int_arg( $args, 'offset', 0, 0, 100000 );
 		$plugin = self::seo_plugin();
 
 		$site = array();
@@ -963,12 +967,12 @@ class NSA_Audit_Tools {
 		$site['tagline']                = get_bloginfo( 'description' );
 
 		$sitemap = 'yoast' === $plugin || 'rankmath' === $plugin ? home_url( '/sitemap_index.xml' ) : home_url( '/wp-sitemap.xml' );
-		list( $res ) = NSA_Tools::fetch( $sitemap );
+		list( $res ) = NomadSA_Tools::fetch( $sitemap );
 		$site['sitemap'] = array(
 			'url'    => $sitemap,
 			'status' => is_wp_error( $res ) ? $res->get_error_message() : wp_remote_retrieve_response_code( $res ),
 		);
-		list( $res ) = NSA_Tools::fetch( home_url( '/robots.txt' ) );
+		list( $res ) = NomadSA_Tools::fetch( home_url( '/robots.txt' ) );
 		$robots      = is_wp_error( $res ) ? '' : wp_remote_retrieve_body( $res );
 		$site['robots_txt'] = array(
 			'content'          => mb_substr( $robots, 0, 2000 ),
@@ -1109,9 +1113,9 @@ class NSA_Audit_Tools {
 			$url = home_url( $url );
 		}
 		if ( wp_parse_url( $url, PHP_URL_HOST ) !== wp_parse_url( home_url(), PHP_URL_HOST ) ) {
-			return new WP_Error( 'nsa_url', 'Only pages on this site can be checked.' );
+			return new WP_Error( 'nomadsa_url', 'Only pages on this site can be checked.' );
 		}
-		list( $res, $ms ) = NSA_Tools::fetch( $url );
+		list( $res, $ms ) = NomadSA_Tools::fetch( $url );
 		if ( is_wp_error( $res ) ) {
 			return $res;
 		}
@@ -1268,7 +1272,7 @@ class NSA_Audit_Tools {
 
 	public static function find_broken_links( $args ) {
 		$external = ! empty( $args['include_external'] );
-		$max      = NSA_Tools::int_arg( $args, 'max_urls', 80, 1, 250 );
+		$max      = NomadSA_Tools::int_arg( $args, 'max_urls', 80, 1, 250 );
 		$host     = wp_parse_url( home_url(), PHP_URL_HOST );
 		$posts    = get_posts( array( 'post_type' => 'any', 'post_status' => 'publish', 'posts_per_page' => 500 ) );
 		$urls     = array();
@@ -1302,10 +1306,10 @@ class NSA_Audit_Tools {
 				break;
 			}
 			$checked++;
-			list( $res ) = NSA_Tools::fetch( $u, 'HEAD' );
+			list( $res ) = NomadSA_Tools::fetch( $u, 'HEAD' );
 			$code = is_wp_error( $res ) ? 0 : wp_remote_retrieve_response_code( $res );
 			if ( in_array( $code, array( 0, 403, 405, 501 ), true ) ) {
-				list( $res ) = NSA_Tools::fetch( $u, 'GET' );
+				list( $res ) = NomadSA_Tools::fetch( $u, 'GET' );
 				$code = is_wp_error( $res ) ? 0 : wp_remote_retrieve_response_code( $res );
 			}
 			if ( 0 === $code || $code >= 400 ) {
@@ -1337,9 +1341,8 @@ class NSA_Audit_Tools {
 			$out['total_mb']   = round( array_sum( wp_list_pluck( (array) $rows, 'mb' ) ), 2 );
 			$out['largest_tables'] = array_slice( (array) $rows, 0, 10 );
 		}
-		$autoload_values = "('yes','on','auto-on','auto')";
-		$out['autoload_kb'] = round( (int) $wpdb->get_var( "SELECT SUM(LENGTH(option_value)) FROM {$wpdb->options} WHERE autoload IN $autoload_values" ) / 1024, 1 );
-		$out['largest_autoloaded_options'] = $wpdb->get_results( "SELECT option_name AS name, ROUND(LENGTH(option_value) / 1024, 1) AS kb FROM {$wpdb->options} WHERE autoload IN $autoload_values ORDER BY LENGTH(option_value) DESC LIMIT 10", ARRAY_A );
+		$out['autoload_kb'] = round( (int) $wpdb->get_var( "SELECT SUM(LENGTH(option_value)) FROM {$wpdb->options} WHERE autoload IN ('yes','on','auto-on','auto')" ) / 1024, 1 );
+		$out['largest_autoloaded_options'] = $wpdb->get_results( "SELECT option_name AS name, ROUND(LENGTH(option_value) / 1024, 1) AS kb FROM {$wpdb->options} WHERE autoload IN ('yes','on','auto-on','auto') ORDER BY LENGTH(option_value) DESC LIMIT 10", ARRAY_A );
 		$out['revisions']          = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'revision'" );
 		$out['auto_drafts']        = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'auto-draft'" );
 		$out['trashed_posts']      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'trash'" );
@@ -1389,7 +1392,7 @@ class NSA_Audit_Tools {
 	}
 
 	public static function read_error_log( $args ) {
-		$lines  = NSA_Tools::int_arg( $args, 'lines', 100, 1, 1000 );
+		$lines  = NomadSA_Tools::int_arg( $args, 'lines', 100, 1, 1000 );
 		$filter = isset( $args['filter'] ) ? (string) $args['filter'] : '';
 		$files  = array();
 		if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) ) {
@@ -1407,11 +1410,9 @@ class NSA_Audit_Tools {
 				continue;
 			}
 			$size = filesize( $f );
-			$fh   = fopen( $f, 'rb' );
 			$read = min( $size, 2 * MB_IN_BYTES );
-			fseek( $fh, -$read, SEEK_END );
-			$chunk = fread( $fh, $read );
-			fclose( $fh );
+			// Only the end of the log matters, and logs can be very large.
+			$chunk = (string) file_get_contents( $f, false, null, max( 0, $size - $read ), $read );
 			$all = preg_split( '/\r?\n/', (string) $chunk );
 			if ( $filter ) {
 				$all = array_filter( $all, function ( $l ) use ( $filter ) {
@@ -1423,7 +1424,7 @@ class NSA_Audit_Tools {
 				'summary' => basename( $f ) . ', ' . size_format( $size ) . ', showing ' . count( $tail ) . ' lines',
 				'file'    => basename( $f ),
 				'size'    => size_format( $size ),
-				'lines'   => array_map( array( 'NSA_Tools', 'redact' ), $tail ),
+				'lines'   => array_map( array( 'NomadSA_Tools', 'redact' ), $tail ),
 			);
 		}
 		return array( 'summary' => 'No readable error log found', 'note' => 'Logging may be off (WP_DEBUG_LOG) or the host keeps logs in its control panel.' );
@@ -1457,7 +1458,7 @@ class NSA_Audit_Tools {
 	}
 
 	public static function list_content( $args ) {
-		$limit = NSA_Tools::int_arg( $args, 'limit', 50, 1, 200 );
+		$limit = NomadSA_Tools::int_arg( $args, 'limit', 50, 1, 200 );
 		$type  = ! empty( $args['post_type'] ) ? sanitize_key( $args['post_type'] ) : 'any';
 		$q     = array(
 			'post_type'      => $type,
@@ -1487,24 +1488,24 @@ class NSA_Audit_Tools {
 	/* ================================================================ Files */
 
 	public static function list_files( $args ) {
-		$dir = NSA_Tools::resolve_path( $args['path'] ?? '' );
+		$dir = NomadSA_Tools::resolve_path( $args['path'] ?? '' );
 		if ( is_wp_error( $dir ) ) {
 			return $dir;
 		}
 		if ( ! is_dir( $dir ) ) {
-			return new WP_Error( 'nsa_path', 'Not a folder.' );
+			return new WP_Error( 'nomadsa_path', 'Not a folder.' );
 		}
-		$depth = NSA_Tools::int_arg( $args, 'depth', 1, 1, 4 );
+		$depth = NomadSA_Tools::int_arg( $args, 'depth', 1, 1, 4 );
 		$out   = array();
 		$it    = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::SELF_FIRST );
 		$it->setMaxDepth( $depth - 1 );
 		foreach ( $it as $f ) {
 			$path = wp_normalize_path( $f->getPathname() );
-			if ( NSA_Tools::is_sensitive_path( $path ) ) {
+			if ( NomadSA_Tools::is_sensitive_path( $path ) ) {
 				continue;
 			}
 			$out[] = array(
-				'path'     => NSA_Tools::relative( $path ),
+				'path'     => NomadSA_Tools::relative( $path ),
 				'type'     => $f->isDir() ? 'folder' : 'file',
 				'size'     => $f->isDir() ? null : $f->getSize(),
 				'modified' => gmdate( 'Y-m-d H:i', $f->getMTime() ),
@@ -1518,34 +1519,34 @@ class NSA_Audit_Tools {
 	}
 
 	public static function read_file( $args ) {
-		$path = NSA_Tools::resolve_path( $args['path'] ?? '' );
+		$path = NomadSA_Tools::resolve_path( $args['path'] ?? '' );
 		if ( is_wp_error( $path ) ) {
 			return $path;
 		}
 		if ( ! is_file( $path ) ) {
-			return new WP_Error( 'nsa_path', 'Not a file.' );
+			return new WP_Error( 'nomadsa_path', 'Not a file.' );
 		}
 		if ( filesize( $path ) > 5 * MB_IN_BYTES ) {
-			return new WP_Error( 'nsa_size', 'File is larger than 5 MB.' );
+			return new WP_Error( 'nomadsa_size', 'File is larger than 5 MB.' );
 		}
 		$content = (string) file_get_contents( $path );
 		if ( preg_match( '/[\x00-\x08\x0E-\x1F]/', substr( $content, 0, 4000 ) ) ) {
-			return new WP_Error( 'nsa_binary', 'This looks like a binary file.' );
+			return new WP_Error( 'nomadsa_binary', 'This looks like a binary file.' );
 		}
 		$lines = preg_split( '/\r?\n/', $content );
-		$start = NSA_Tools::int_arg( $args, 'start_line', 1, 1, max( 1, count( $lines ) ) );
-		$max   = NSA_Tools::int_arg( $args, 'max_lines', 400, 1, 2000 );
+		$start = NomadSA_Tools::int_arg( $args, 'start_line', 1, 1, max( 1, count( $lines ) ) );
+		$max   = NomadSA_Tools::int_arg( $args, 'max_lines', 400, 1, 2000 );
 		$slice = array_slice( $lines, $start - 1, $max );
 		$text  = '';
 		foreach ( $slice as $i => $l ) {
 			$text .= str_pad( (string) ( $start + $i ), 5, ' ', STR_PAD_LEFT ) . '  ' . $l . "\n";
 		}
-		$header = NSA_Tools::relative( $path ) . ' (' . count( $lines ) . ' lines, modified ' . gmdate( 'Y-m-d H:i', filemtime( $path ) ) . ' UTC, showing ' . $start . ' to ' . ( $start + count( $slice ) - 1 ) . ")\n\n";
-		return $header . NSA_Tools::redact( $text );
+		$header = NomadSA_Tools::relative( $path ) . ' (' . count( $lines ) . ' lines, modified ' . gmdate( 'Y-m-d H:i', filemtime( $path ) ) . ' UTC, showing ' . $start . ' to ' . ( $start + count( $slice ) - 1 ) . ")\n\n";
+		return $header . NomadSA_Tools::redact( $text );
 	}
 
 	public static function search_code( $args ) {
-		$root = NSA_Tools::resolve_path( $args['path'] ?? 'wp-content' );
+		$root = NomadSA_Tools::resolve_path( $args['path'] ?? 'wp-content' );
 		if ( is_wp_error( $root ) ) {
 			return $root;
 		}
@@ -1554,58 +1555,55 @@ class NSA_Audit_Tools {
 		if ( $is_re ) {
 			$re = '~' . str_replace( '~', '\~', $pattern ) . '~i';
 			if ( false === @preg_match( $re, '' ) ) {
-				return new WP_Error( 'nsa_regex', 'Invalid regular expression.' );
+				return new WP_Error( 'nomadsa_regex', 'Invalid regular expression.' );
 			}
 		}
 		$exts = ! empty( $args['extensions'] ) && is_array( $args['extensions'] ) ? array_map( 'strtolower', $args['extensions'] ) : array( 'php', 'js', 'css', 'html', 'twig', 'json', 'txt' );
-		$max  = NSA_Tools::int_arg( $args, 'max_results', 100, 1, 500 );
+		$max  = NomadSA_Tools::int_arg( $args, 'max_results', 100, 1, 500 );
 		$hits = array();
 		$files = 0;
 		$it   = is_dir( $root ) ? new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ) ) : array( new SplFileInfo( $root ) );
 		foreach ( $it as $f ) {
 			$path = wp_normalize_path( $f->getPathname() );
-			if ( ! in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), $exts, true ) || NSA_Tools::is_sensitive_path( $path ) || $f->getSize() > MB_IN_BYTES ) {
+			if ( ! in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), $exts, true ) || NomadSA_Tools::is_sensitive_path( $path ) || $f->getSize() > MB_IN_BYTES ) {
 				continue;
 			}
 			if ( ++$files > 20000 ) {
 				break;
 			}
-			$fh = @fopen( $path, 'rb' );
-			if ( ! $fh ) {
+			$lines = @file( $path );
+			if ( ! $lines ) {
 				continue;
 			}
-			$n = 0;
-			while ( false !== ( $line = fgets( $fh ) ) ) {
-				$n++;
+			foreach ( $lines as $i => $line ) {
 				$match = $is_re ? preg_match( $re, $line ) : ( false !== stripos( $line, $pattern ) );
 				if ( $match ) {
-					$hits[] = array( 'file' => NSA_Tools::relative( $path ), 'line' => $n, 'text' => mb_substr( trim( NSA_Tools::redact( $line ) ), 0, 240 ) );
+					$hits[] = array( 'file' => NomadSA_Tools::relative( $path ), 'line' => $i + 1, 'text' => mb_substr( trim( NomadSA_Tools::redact( $line ) ), 0, 240 ) );
 					if ( count( $hits ) >= $max ) {
-						fclose( $fh );
 						break 2;
 					}
 				}
 			}
-			fclose( $fh );
 		}
 		return array( 'summary' => count( $hits ) . ' matches in ' . $files . ' files searched', 'matches' => $hits );
 	}
 
 	public static function get_activity_log( $args ) {
 		global $wpdb;
-		$limit = NSA_Tools::int_arg( $args, 'limit', 50, 1, 500 );
-		$where = '';
-		if ( ! empty( $args['kind'] ) && in_array( $args['kind'], array( 'audit', 'fix' ), true ) ) {
-			$where = $wpdb->prepare( ' WHERE kind = %s', $args['kind'] );
+		$limit = NomadSA_Tools::int_arg( $args, 'limit', 50, 1, 500 );
+		$kind  = ( ! empty( $args['kind'] ) && in_array( $args['kind'], array( 'audit', 'fix' ), true ) ) ? $args['kind'] : '';
+		if ( $kind ) {
+			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, user_id, tool, kind, status, summary FROM %i WHERE kind = %s ORDER BY id DESC LIMIT %d', NomadSA_DB::table( 'log' ), $kind, $limit ), ARRAY_A );
+		} else {
+			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, user_id, tool, kind, status, summary FROM %i ORDER BY id DESC LIMIT %d', NomadSA_DB::table( 'log' ), $limit ), ARRAY_A );
 		}
-		$rows = $wpdb->get_results( 'SELECT id, created_at, user_id, tool, kind, status, summary FROM ' . NSA_DB::table( 'log' ) . $where . ' ORDER BY id DESC LIMIT ' . $limit, ARRAY_A );
 		return array( 'summary' => count( $rows ) . ' entries (times in UTC)', 'entries' => $rows );
 	}
 
 	public static function list_backups( $args ) {
 		global $wpdb;
-		$limit = NSA_Tools::int_arg( $args, 'limit', 50, 1, 500 );
-		$rows  = $wpdb->get_results( 'SELECT id, created_at, kind, target, LENGTH(content) AS stored_bytes FROM ' . NSA_DB::table( 'backups' ) . ' ORDER BY id DESC LIMIT ' . $limit, ARRAY_A );
+		$limit = NomadSA_Tools::int_arg( $args, 'limit', 50, 1, 500 );
+		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, kind, target, LENGTH(content) AS stored_bytes FROM %i ORDER BY id DESC LIMIT %d', NomadSA_DB::table( 'backups' ), $limit ), ARRAY_A );
 		return array( 'summary' => count( $rows ) . ' backups', 'backups' => $rows );
 	}
 }

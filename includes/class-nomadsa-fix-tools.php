@@ -1,11 +1,14 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+// Queries here use the plugin's own tables or read only counts, which WordPress has no API or cache for.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 /**
  * Tools that change the site. Every callback receives ( $args, $confirm ).
  * Without confirm it returns a preview and changes nothing.
  */
-class NSA_Fix_Tools {
+class NomadSA_Fix_Tools {
 
 	const SITE_SETTINGS = array(
 		'blogname'               => 'string',
@@ -31,7 +34,7 @@ class NSA_Fix_Tools {
 	public static function register() {
 		$c = __CLASS__;
 
-		NSA_Tools::register( 'update_plugins', array(
+		NomadSA_Tools::register( 'update_plugins', array(
 			'kind'        => 'fix',
 			'title'       => 'Update plugins',
 			'description' => 'Updates plugins to their latest versions. Afterwards the homepage is loaded to confirm the site still works.',
@@ -42,7 +45,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'update_plugins' ),
 		) );
 
-		NSA_Tools::register( 'update_themes', array(
+		NomadSA_Tools::register( 'update_themes', array(
 			'kind'        => 'fix',
 			'title'       => 'Update themes',
 			'description' => 'Updates themes to their latest versions. Changes made directly to a theme (not a child theme) are lost.',
@@ -53,7 +56,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'update_themes' ),
 		) );
 
-		NSA_Tools::register( 'update_core', array(
+		NomadSA_Tools::register( 'update_core', array(
 			'kind'        => 'fix',
 			'title'       => 'Update WordPress',
 			'description' => 'Updates WordPress itself to the latest offered version.',
@@ -61,7 +64,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'update_core' ),
 		) );
 
-		NSA_Tools::register( 'set_plugin_status', array(
+		NomadSA_Tools::register( 'set_plugin_status', array(
 			'kind'        => 'fix',
 			'title'       => 'Activate or deactivate a plugin',
 			'description' => 'Turns a plugin on or off. Settings are kept.',
@@ -73,7 +76,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'set_plugin_status' ),
 		) );
 
-		NSA_Tools::register( 'delete_plugin', array(
+		NomadSA_Tools::register( 'delete_plugin', array(
 			'kind'        => 'fix',
 			'title'       => 'Delete an inactive plugin',
 			'description' => 'Permanently deletes an inactive plugin and its files. The plugin can be reinstalled later but this cannot be undone through the connector.',
@@ -83,7 +86,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'delete_plugin' ),
 		) );
 
-		NSA_Tools::register( 'delete_theme', array(
+		NomadSA_Tools::register( 'delete_theme', array(
 			'kind'        => 'fix',
 			'title'       => 'Delete an unused theme',
 			'description' => 'Permanently deletes an installed theme that is not active and is not the parent of the active theme.',
@@ -93,7 +96,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'delete_theme' ),
 		) );
 
-		NSA_Tools::register( 'delete_uploads_path', array(
+		NomadSA_Tools::register( 'delete_uploads_path', array(
 			'kind'        => 'fix',
 			'title'       => 'Delete a file or folder in uploads',
 			'description' => 'Permanently deletes a file or folder inside wp-content/uploads, for example data left behind by a removed plugin. The preview lists what would be removed. Media files are flagged so they are not removed by mistake. Cannot be undone through the connector.',
@@ -103,7 +106,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'delete_uploads_path' ),
 		) );
 
-		NSA_Tools::register( 'apply_hardening', array(
+		NomadSA_Tools::register( 'apply_hardening', array(
 			'kind'        => 'fix',
 			'title'       => 'Apply security hardening',
 			'description' => 'Switches security hardening options on or off: ' . implode( ' ', array_map( function ( $k, $v ) { return $k . ': ' . $v; }, array_keys( self::HARDENING ), self::HARDENING ) ),
@@ -120,7 +123,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'apply_hardening' ),
 		) );
 
-		NSA_Tools::register( 'set_security_headers', array(
+		NomadSA_Tools::register( 'set_security_headers', array(
 			'kind'        => 'fix',
 			'title'       => 'Set browser security headers',
 			'description' => 'Sends security headers with every page. preset recommended sets safe defaults (HSTS, nosniff, SAMEORIGIN framing, referrer policy, permissions policy). Use custom with headers to set exact values, or off to remove them.',
@@ -132,7 +135,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'set_security_headers' ),
 		) );
 
-		NSA_Tools::register( 'update_seo_meta', array(
+		NomadSA_Tools::register( 'update_seo_meta', array(
 			'kind'        => 'fix',
 			'title'       => 'Update search title and description',
 			'description' => 'Sets the search title, meta description and noindex for a page or post through Yoast SEO or Rank Math. Previous values are backed up.',
@@ -146,7 +149,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'update_seo_meta' ),
 		) );
 
-		NSA_Tools::register( 'update_image_alt', array(
+		NomadSA_Tools::register( 'update_image_alt', array(
 			'kind'        => 'fix',
 			'title'       => 'Update image alt text',
 			'description' => 'Sets alt text on media library images (used for accessibility and image search). Previous values are backed up.',
@@ -164,7 +167,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'update_image_alt' ),
 		) );
 
-		NSA_Tools::register( 'replace_in_content', array(
+		NomadSA_Tools::register( 'replace_in_content', array(
 			'kind'        => 'fix',
 			'title'       => 'Replace text in a page',
 			'description' => 'Finds and replaces exact text in a page or post, including Elementor content. Useful for fixing broken links or wording. The previous version is backed up.',
@@ -177,7 +180,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'replace_in_content' ),
 		) );
 
-		NSA_Tools::register( 'edit_file', array(
+		NomadSA_Tools::register( 'edit_file', array(
 			'kind'        => 'fix',
 			'title'       => 'Edit a theme or must-use plugin file',
 			'description' => 'Edits a file in wp-content/themes or wp-content/mu-plugins, either by replacing exact text (search and replace) or by writing full content (also creates new files). PHP is syntax checked before saving and the original is backed up. Prefer a child theme over editing a parent theme, since updates overwrite parent theme files.',
@@ -192,7 +195,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'edit_file' ),
 		) );
 
-		NSA_Tools::register( 'set_custom_css', array(
+		NomadSA_Tools::register( 'set_custom_css', array(
 			'kind'        => 'fix',
 			'title'       => 'Add custom CSS',
 			'description' => 'Adds CSS to every page through the connector (separate from the theme). Useful for small visual or speed fixes, for example hiding a loading screen. mode replace or append.',
@@ -204,7 +207,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'set_custom_css' ),
 		) );
 
-		NSA_Tools::register( 'set_site_setting', array(
+		NomadSA_Tools::register( 'set_site_setting', array(
 			'kind'        => 'fix',
 			'title'       => 'Change a site setting',
 			'description' => 'Changes one of these settings: ' . implode( ', ', array_keys( self::SITE_SETTINGS ) ) . '.',
@@ -216,7 +219,7 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'set_site_setting' ),
 		) );
 
-		NSA_Tools::register( 'clean_database', array(
+		NomadSA_Tools::register( 'clean_database', array(
 			'kind'        => 'fix',
 			'title'       => 'Clean the database',
 			'description' => 'Removes old revisions (keeping the latest per page), auto drafts, trashed posts, spam and trashed comments and expired temporary data. Choose which with the options; all default to true. This cannot be undone through the connector.',
@@ -232,14 +235,14 @@ class NSA_Fix_Tools {
 			'callback'    => array( $c, 'clean_database' ),
 		) );
 
-		NSA_Tools::register( 'flush_caches', array(
+		NomadSA_Tools::register( 'flush_caches', array(
 			'kind'        => 'fix',
 			'title'       => 'Clear caches',
 			'description' => 'Clears the WordPress object cache and any page cache from SiteGround Optimizer, WP Rocket, LiteSpeed, W3 Total Cache, WP Super Cache, Autoptimize and Elementor CSS. Safe to run after changes.',
 			'callback'    => array( $c, 'flush_caches' ),
 		) );
 
-		NSA_Tools::register( 'restore_backup', array(
+		NomadSA_Tools::register( 'restore_backup', array(
 			'kind'        => 'fix',
 			'title'       => 'Undo a change',
 			'description' => 'Restores a backup made by the connector before a change (files, search titles, alt text, page content, settings, custom CSS). Find the ID with list_backups.',
@@ -262,7 +265,7 @@ class NSA_Fix_Tools {
 			require_once ABSPATH . 'wp-admin/includes/file.php';
 		}
 		if ( 'direct' !== get_filesystem_method() ) {
-			return new WP_Error( 'nsa_fs', 'This server needs FTP details to install updates, so updates cannot run through the connector. Run them from the dashboard instead.' );
+			return new WP_Error( 'nomadsa_fs', 'This server needs FTP details to install updates, so updates cannot run through the connector. Run them from the dashboard instead.' );
 		}
 		WP_Filesystem();
 		return true;
@@ -283,7 +286,7 @@ class NSA_Fix_Tools {
 	}
 
 	private static function health_check() {
-		list( $res, $ms ) = NSA_Tools::fetch( home_url( '/' ) );
+		list( $res, $ms ) = NomadSA_Tools::fetch( home_url( '/' ) );
 		if ( is_wp_error( $res ) ) {
 			return array( 'ok' => false, 'detail' => $res->get_error_message() );
 		}
@@ -294,7 +297,7 @@ class NSA_Fix_Tools {
 	}
 
 	private static function editable_path( $relative ) {
-		$abs = NSA_Tools::resolve_path( $relative, false );
+		$abs = NomadSA_Tools::resolve_path( $relative, false );
 		if ( is_wp_error( $abs ) ) {
 			return $abs;
 		}
@@ -307,7 +310,7 @@ class NSA_Fix_Tools {
 				return $abs;
 			}
 		}
-		return new WP_Error( 'nsa_path', 'Only files in wp-content/themes and wp-content/mu-plugins can be edited through the connector.' );
+		return new WP_Error( 'nomadsa_path', 'Only files in wp-content/themes and wp-content/mu-plugins can be edited through the connector.' );
 	}
 
 	private static function php_syntax_error( $code ) {
@@ -338,7 +341,7 @@ class NSA_Fix_Tools {
 			foreach ( $wanted as $w ) {
 				$f = self::plugin_file( (string) $w );
 				if ( ! $f ) {
-					return new WP_Error( 'nsa_plugin', 'Plugin not found: ' . $w );
+					return new WP_Error( 'nomadsa_plugin', 'Plugin not found: ' . $w );
 				}
 				$files[] = $f;
 			}
@@ -399,7 +402,7 @@ class NSA_Fix_Tools {
 		foreach ( $slugs as $s ) {
 			$t = wp_get_theme( $s );
 			if ( ! $t->exists() ) {
-				return new WP_Error( 'nsa_theme', 'Theme not found: ' . $s );
+				return new WP_Error( 'nomadsa_theme', 'Theme not found: ' . $s );
 			}
 			if ( ! empty( $avail[ $s ]['package'] ) ) {
 				$plan[ $s ] = array( 'name' => $t->get( 'Name' ), 'from' => $t->get( 'Version' ), 'to' => $avail[ $s ]['new_version'] );
@@ -476,10 +479,10 @@ class NSA_Fix_Tools {
 	public static function set_plugin_status( $args, $confirm ) {
 		$file = self::plugin_file( (string) $args['plugin'] );
 		if ( ! $file ) {
-			return new WP_Error( 'nsa_plugin', 'Plugin not found.' );
+			return new WP_Error( 'nomadsa_plugin', 'Plugin not found.' );
 		}
-		if ( plugin_basename( NSA_FILE ) === $file ) {
-			return new WP_Error( 'nsa_plugin', 'The connector cannot switch itself off. Do that from the Plugins screen.' );
+		if ( plugin_basename( NOMADSA_FILE ) === $file ) {
+			return new WP_Error( 'nomadsa_plugin', 'The connector cannot switch itself off. Do that from the Plugins screen.' );
 		}
 		$want = (bool) $args['active'];
 		$is   = is_plugin_active( $file );
@@ -505,10 +508,10 @@ class NSA_Fix_Tools {
 	public static function delete_plugin( $args, $confirm ) {
 		$file = self::plugin_file( (string) $args['plugin'] );
 		if ( ! $file ) {
-			return new WP_Error( 'nsa_plugin', 'Plugin not found.' );
+			return new WP_Error( 'nomadsa_plugin', 'Plugin not found.' );
 		}
 		if ( is_plugin_active( $file ) ) {
-			return new WP_Error( 'nsa_plugin', 'Deactivate the plugin before deleting it.' );
+			return new WP_Error( 'nomadsa_plugin', 'Deactivate the plugin before deleting it.' );
 		}
 		$name = get_plugins()[ $file ]['Name'];
 		if ( ! $confirm ) {
@@ -530,10 +533,10 @@ class NSA_Fix_Tools {
 		$slug  = sanitize_key( (string) $args['theme'] );
 		$theme = wp_get_theme( $slug );
 		if ( ! $theme->exists() ) {
-			return new WP_Error( 'nsa_theme', 'Theme not found: ' . $slug );
+			return new WP_Error( 'nomadsa_theme', 'Theme not found: ' . $slug );
 		}
 		if ( get_stylesheet() === $slug || get_template() === $slug ) {
-			return new WP_Error( 'nsa_theme', 'This theme is in use (active theme or its parent) and cannot be deleted.' );
+			return new WP_Error( 'nomadsa_theme', 'This theme is in use (active theme or its parent) and cannot be deleted.' );
 		}
 		if ( ! $confirm ) {
 			$remaining = array_diff( array_keys( wp_get_themes() ), array( $slug, get_stylesheet(), get_template() ) );
@@ -556,16 +559,16 @@ class NSA_Fix_Tools {
 	}
 
 	public static function delete_uploads_path( $args, $confirm ) {
-		$path = NSA_Tools::resolve_path( (string) $args['path'] );
+		$path = NomadSA_Tools::resolve_path( (string) $args['path'] );
 		if ( is_wp_error( $path ) ) {
 			return $path;
 		}
 		$uploads = wp_normalize_path( untrailingslashit( realpath( wp_get_upload_dir()['basedir'] ) ) );
 		if ( 0 !== strpos( $path, $uploads . '/' ) ) {
-			return new WP_Error( 'nsa_path', 'Only files and folders inside wp-content/uploads can be deleted, and never the uploads folder itself.' );
+			return new WP_Error( 'nomadsa_path', 'Only files and folders inside wp-content/uploads can be deleted, and never the uploads folder itself.' );
 		}
 		if ( preg_match( '#^' . preg_quote( $uploads, '#' ) . '/\d{4}(/\d{2})?$#', $path ) ) {
-			return new WP_Error( 'nsa_path', 'Year and month media folders cannot be deleted as a whole. Delete media from the Media Library instead.' );
+			return new WP_Error( 'nomadsa_path', 'Year and month media folders cannot be deleted as a whole. Delete media from the Media Library instead.' );
 		}
 		$files = is_dir( $path ) ? iterator_to_array( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST ), false ) : array( new SplFileInfo( $path ) );
 		$count = 0;
@@ -580,7 +583,7 @@ class NSA_Fix_Tools {
 					$media++;
 				}
 				if ( count( $list ) < 30 ) {
-					$list[] = NSA_Tools::relative( $f->getPathname() );
+					$list[] = NomadSA_Tools::relative( $f->getPathname() );
 				}
 			}
 		}
@@ -589,35 +592,29 @@ class NSA_Fix_Tools {
 			if ( $media ) {
 				$notes[] = $media . ' of these look like media or documents. Make sure none are used on the site.';
 			}
-			return array( 'summary' => 'Permanently delete ' . NSA_Tools::relative( $path ) . ' (' . $count . ' files, ' . size_format( $size ) . ')', 'files' => $list, 'more_files' => max( 0, $count - count( $list ) ), 'notes' => $notes );
+			return array( 'summary' => 'Permanently delete ' . NomadSA_Tools::relative( $path ) . ' (' . $count . ' files, ' . size_format( $size ) . ')', 'files' => $list, 'more_files' => max( 0, $count - count( $list ) ), 'notes' => $notes );
 		}
-		$deleted = 0;
-		foreach ( $files as $f ) {
-			$p = $f->getPathname();
-			if ( $f->isDir() && ! $f->isLink() ) {
-				@rmdir( $p );
-			} elseif ( @unlink( $p ) ) {
-				$deleted++;
-			}
+		$fs = self::filesystem_ready();
+		if ( is_wp_error( $fs ) ) {
+			return $fs;
 		}
-		if ( is_dir( $path ) ) {
-			@rmdir( $path );
-		}
+		global $wp_filesystem;
+		$wp_filesystem->delete( $path, true );
 		if ( file_exists( $path ) ) {
-			return new WP_Error( 'nsa_delete', 'Deleted ' . $deleted . ' files, but some could not be removed (permissions).' );
+			return new WP_Error( 'nomadsa_delete', 'Some files could not be removed (permissions).' );
 		}
-		return array( 'summary' => 'Deleted ' . NSA_Tools::relative( $path ) . ' (' . $deleted . ' files)' );
+		return array( 'summary' => 'Deleted ' . NomadSA_Tools::relative( $path ) . ' (' . $count . ' files)' );
 	}
 
 	/* ================================================================ Security settings */
 
 	public static function apply_hardening( $args, $confirm ) {
 		$req = isset( $args['settings'] ) && is_array( $args['settings'] ) ? $args['settings'] : array();
-		$cur = NSA_Settings::runtime();
+		$cur = NomadSA_Settings::runtime();
 		$changes = array();
 		foreach ( $req as $k => $v ) {
 			if ( ! isset( self::HARDENING[ $k ] ) ) {
-				return new WP_Error( 'nsa_setting', 'Unknown option: ' . $k );
+				return new WP_Error( 'nomadsa_setting', 'Unknown option: ' . $k );
 			}
 			if ( (bool) $cur[ $k ] !== (bool) $v ) {
 				$changes[ $k ] = array( 'from' => (bool) $cur[ $k ], 'to' => (bool) $v, 'what' => self::HARDENING[ $k ] );
@@ -636,15 +633,15 @@ class NSA_Fix_Tools {
 			}
 			return array( 'summary' => count( $changes ) . ' hardening changes', 'changes' => $changes, 'notes' => $notes );
 		}
-		NSA_DB::backup( 'runtime', 'hardening', wp_json_encode( array_intersect_key( $cur, $changes ) ) );
+		NomadSA_DB::backup( 'runtime', 'hardening', wp_json_encode( array_intersect_key( $cur, $changes ) ) );
 		$new = array();
 		foreach ( $changes as $k => $c ) {
 			$new[ $k ] = $c['to'];
 		}
-		NSA_Settings::update_runtime( $new );
+		NomadSA_Settings::update_runtime( $new );
 		$deleted = array();
 		if ( ! empty( $new['remove_core_info_files'] ) ) {
-			$deleted = NSA_Runtime::remove_core_info_files();
+			$deleted = NomadSA_Runtime::remove_core_info_files();
 		}
 		return array( 'summary' => 'Applied ' . count( $changes ) . ' hardening changes', 'applied' => $new, 'files_deleted' => $deleted, 'next' => 'Run flush_caches so the changes reach visitors.' );
 	}
@@ -664,7 +661,7 @@ class NSA_Fix_Tools {
 
 	public static function set_security_headers( $args, $confirm ) {
 		$preset = (string) $args['preset'];
-		$cur    = (array) NSA_Settings::runtime( 'security_headers' );
+		$cur    = (array) NomadSA_Settings::runtime( 'security_headers' );
 		if ( 'recommended' === $preset ) {
 			$new = self::recommended_headers();
 		} elseif ( 'off' === $preset ) {
@@ -684,7 +681,7 @@ class NSA_Fix_Tools {
 				}
 			}
 		} else {
-			return new WP_Error( 'nsa_preset', 'Unknown preset.' );
+			return new WP_Error( 'nomadsa_preset', 'Unknown preset.' );
 		}
 		if ( ! $confirm ) {
 			$notes = array();
@@ -696,15 +693,15 @@ class NSA_Fix_Tools {
 			}
 			return array( 'summary' => count( $new ) . ' security headers', 'current' => $cur, 'new' => $new, 'notes' => $notes );
 		}
-		NSA_DB::backup( 'runtime', 'security_headers', wp_json_encode( array( 'security_headers' => $cur ) ) );
-		NSA_Settings::update_runtime( array( 'security_headers' => $new ) );
+		NomadSA_DB::backup( 'runtime', 'security_headers', wp_json_encode( array( 'security_headers' => $cur ) ) );
+		NomadSA_Settings::update_runtime( array( 'security_headers' => $new ) );
 		return array( 'summary' => count( $new ) . ' security headers now sent', 'headers' => $new, 'next' => 'Run flush_caches, then check_page to confirm the headers arrive. Some hosts add or strip headers at server level.' );
 	}
 
 	public static function set_site_setting( $args, $confirm ) {
 		$name = (string) $args['name'];
 		if ( ! isset( self::SITE_SETTINGS[ $name ] ) ) {
-			return new WP_Error( 'nsa_setting', 'This setting cannot be changed through the connector.' );
+			return new WP_Error( 'nomadsa_setting', 'This setting cannot be changed through the connector.' );
 		}
 		$type  = self::SITE_SETTINGS[ $name ];
 		$value = $args['value'];
@@ -715,10 +712,10 @@ class NSA_Fix_Tools {
 			case 'role':
 				$value = sanitize_key( $value );
 				if ( ! get_role( $value ) ) {
-					return new WP_Error( 'nsa_setting', 'Unknown role.' );
+					return new WP_Error( 'nomadsa_setting', 'Unknown role.' );
 				}
 				if ( in_array( $value, array( 'administrator', 'editor' ), true ) ) {
-					return new WP_Error( 'nsa_setting', 'For safety the default role for new users cannot be administrator or editor.' );
+					return new WP_Error( 'nomadsa_setting', 'For safety the default role for new users cannot be administrator or editor.' );
 				}
 				break;
 			case 'open_closed':
@@ -735,7 +732,7 @@ class NSA_Fix_Tools {
 			$note = 'blog_public' === $name && ! $value ? 'This hides the whole site from search engines.' : '';
 			return array( 'summary' => 'Change ' . $name, 'from' => $cur, 'to' => $value, 'note' => $note );
 		}
-		NSA_DB::backup( 'option', $name, wp_json_encode( array( 'value' => $cur ) ) );
+		NomadSA_DB::backup( 'option', $name, wp_json_encode( array( 'value' => $cur ) ) );
 		update_option( $name, $value );
 		return array( 'summary' => $name . ' changed from ' . $cur . ' to ' . $value );
 	}
@@ -745,16 +742,16 @@ class NSA_Fix_Tools {
 	public static function update_seo_meta( $args, $confirm ) {
 		$post = get_post( (int) $args['post_id'] );
 		if ( ! $post ) {
-			return new WP_Error( 'nsa_post', 'Post not found.' );
+			return new WP_Error( 'nomadsa_post', 'Post not found.' );
 		}
 		$plugin = defined( 'WPSEO_VERSION' ) ? 'yoast' : ( ( class_exists( 'RankMath' ) || defined( 'RANK_MATH_VERSION' ) ) ? 'rankmath' : '' );
 		if ( ! $plugin ) {
-			return new WP_Error( 'nsa_seo', 'No supported search optimisation plugin (Yoast SEO or Rank Math) is active.' );
+			return new WP_Error( 'nomadsa_seo', 'No supported search optimisation plugin (Yoast SEO or Rank Math) is active.' );
 		}
 		$keys = 'yoast' === $plugin
 			? array( 'title' => '_yoast_wpseo_title', 'description' => '_yoast_wpseo_metadesc', 'noindex' => '_yoast_wpseo_meta-robots-noindex' )
 			: array( 'title' => 'rank_math_title', 'description' => 'rank_math_description', 'noindex' => 'rank_math_robots' );
-		$current = NSA_Audit_Tools::seo_meta( $post->ID );
+		$current = NomadSA_Audit_Tools::seo_meta( $post->ID );
 		$changes = array();
 		foreach ( array( 'title', 'description', 'noindex' ) as $f ) {
 			if ( array_key_exists( $f, $args ) ) {
@@ -784,7 +781,7 @@ class NSA_Fix_Tools {
 		foreach ( $keys as $f => $k ) {
 			$backup[ $k ] = get_post_meta( $post->ID, $k, true );
 		}
-		NSA_DB::backup( 'post_meta', 'post:' . $post->ID, wp_json_encode( $backup ) );
+		NomadSA_DB::backup( 'post_meta', 'post:' . $post->ID, wp_json_encode( $backup ) );
 		foreach ( $changes as $f => $c ) {
 			if ( 'noindex' === $f ) {
 				if ( 'yoast' === $plugin ) {
@@ -799,7 +796,7 @@ class NSA_Fix_Tools {
 			}
 		}
 		if ( 'yoast' === $plugin ) {
-			do_action( 'wpseo_save_postdata', $post->ID );
+			do_action( 'wpseo_save_postdata', $post->ID ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Yoast SEO's own hook, so it refreshes its index.
 		}
 		clean_post_cache( $post->ID );
 		return array( 'summary' => 'Search settings updated for "' . $post->post_title . '"', 'changes' => $changes );
@@ -808,14 +805,14 @@ class NSA_Fix_Tools {
 	public static function update_image_alt( $args, $confirm ) {
 		$items = (array) $args['items'];
 		if ( count( $items ) > 200 ) {
-			return new WP_Error( 'nsa_items', 'At most 200 images at a time.' );
+			return new WP_Error( 'nomadsa_items', 'At most 200 images at a time.' );
 		}
 		$plan = array();
 		foreach ( $items as $it ) {
 			$id = (int) ( $it['attachment_id'] ?? 0 );
 			$p  = get_post( $id );
 			if ( ! $p || 'attachment' !== $p->post_type ) {
-				return new WP_Error( 'nsa_attachment', 'Not a media item: ' . $id );
+				return new WP_Error( 'nomadsa_attachment', 'Not a media item: ' . $id );
 			}
 			$plan[ $id ] = array( 'file' => basename( (string) get_attached_file( $id ) ), 'from' => (string) get_post_meta( $id, '_wp_attachment_image_alt', true ), 'to' => sanitize_text_field( (string) ( $it['alt'] ?? '' ) ) );
 		}
@@ -826,7 +823,7 @@ class NSA_Fix_Tools {
 		foreach ( $plan as $id => $c ) {
 			$backup[ $id ] = $c['from'];
 		}
-		NSA_DB::backup( 'image_alt', 'attachments', wp_json_encode( $backup ) );
+		NomadSA_DB::backup( 'image_alt', 'attachments', wp_json_encode( $backup ) );
 		foreach ( $plan as $id => $c ) {
 			update_post_meta( $id, '_wp_attachment_image_alt', $c['to'] );
 		}
@@ -849,12 +846,12 @@ class NSA_Fix_Tools {
 	public static function replace_in_content( $args, $confirm ) {
 		$post = get_post( (int) $args['post_id'] );
 		if ( ! $post ) {
-			return new WP_Error( 'nsa_post', 'Post not found.' );
+			return new WP_Error( 'nomadsa_post', 'Post not found.' );
 		}
 		$search  = (string) $args['search'];
 		$replace = (string) $args['replace'];
 		if ( '' === $search ) {
-			return new WP_Error( 'nsa_search', 'Search text cannot be empty.' );
+			return new WP_Error( 'nomadsa_search', 'Search text cannot be empty.' );
 		}
 		$in_content = substr_count( $post->post_content, $search );
 		$el_raw     = get_post_meta( $post->ID, '_elementor_data', true );
@@ -865,7 +862,7 @@ class NSA_Fix_Tools {
 			self::replace_recursive( $copy, $search, $replace, $in_el );
 		}
 		if ( 0 === $in_content + $in_el ) {
-			return new WP_Error( 'nsa_search', 'The text was not found in this page.' );
+			return new WP_Error( 'nomadsa_search', 'The text was not found in this page.' );
 		}
 		if ( ! $confirm ) {
 			$pos = strpos( $post->post_content, $search );
@@ -876,7 +873,7 @@ class NSA_Fix_Tools {
 				'context'          => false !== $pos ? mb_substr( $post->post_content, max( 0, $pos - 80 ), strlen( $search ) + 160 ) : '',
 			);
 		}
-		NSA_DB::backup( 'post', 'post:' . $post->ID, wp_json_encode( array( 'post_content' => $post->post_content, '_elementor_data' => $el_raw ) ) );
+		NomadSA_DB::backup( 'post', 'post:' . $post->ID, wp_json_encode( array( 'post_content' => $post->post_content, '_elementor_data' => $el_raw ) ) );
 		if ( $in_content ) {
 			wp_update_post( array( 'ID' => $post->ID, 'post_content' => str_replace( $search, $replace, $post->post_content ) ) );
 		}
@@ -904,24 +901,24 @@ class NSA_Fix_Tools {
 			$new = (string) $args['content'];
 		} elseif ( isset( $args['search'] ) ) {
 			if ( ! $exists ) {
-				return new WP_Error( 'nsa_file', 'File does not exist.' );
+				return new WP_Error( 'nomadsa_file', 'File does not exist.' );
 			}
 			$count = substr_count( $old, (string) $args['search'] );
 			if ( 1 !== $count ) {
-				return new WP_Error( 'nsa_file', 'The search text must occur exactly once, it occurs ' . $count . ' times. Include more surrounding lines.' );
+				return new WP_Error( 'nomadsa_file', 'The search text must occur exactly once, it occurs ' . $count . ' times. Include more surrounding lines.' );
 			}
 			$new = str_replace( (string) $args['search'], (string) ( $args['replace'] ?? '' ), $old );
 		} else {
-			return new WP_Error( 'nsa_file', 'Provide either content, or search and replace.' );
+			return new WP_Error( 'nomadsa_file', 'Provide either content, or search and replace.' );
 		}
 		$is_php = (bool) preg_match( '/\.php$/i', $path );
 		if ( $is_php ) {
 			$err = self::php_syntax_error( $new );
 			if ( $err ) {
-				return new WP_Error( 'nsa_syntax', $err . '. Nothing was saved.' );
+				return new WP_Error( 'nomadsa_syntax', $err . '. Nothing was saved.' );
 			}
 		}
-		$rel = NSA_Tools::relative( $path );
+		$rel = NomadSA_Tools::relative( $path );
 		if ( ! $confirm ) {
 			$notes = array();
 			$parent = wp_normalize_path( get_template_directory() );
@@ -939,12 +936,12 @@ class NSA_Fix_Tools {
 		if ( ! $exists && ! is_dir( dirname( $path ) ) ) {
 			wp_mkdir_p( dirname( $path ) );
 		}
-		if ( ! is_writable( $exists ? $path : dirname( $path ) ) ) {
-			return new WP_Error( 'nsa_file', 'The file is not writable by WordPress.' );
+		if ( ! wp_is_writable( $exists ? $path : dirname( $path ) ) ) {
+			return new WP_Error( 'nomadsa_file', 'The file is not writable by WordPress.' );
 		}
-		$backup_id = NSA_DB::backup( 'file', $rel, $exists ? $old : '' );
+		$backup_id = NomadSA_DB::backup( 'file', $rel, $exists ? $old : '' );
 		if ( false === file_put_contents( $path, $new ) ) {
-			return new WP_Error( 'nsa_file', 'Could not write the file.' );
+			return new WP_Error( 'nomadsa_file', 'Could not write the file.' );
 		}
 		if ( function_exists( 'opcache_invalidate' ) ) {
 			@opcache_invalidate( $path, true );
@@ -955,12 +952,12 @@ class NSA_Fix_Tools {
 			if ( $exists ) {
 				file_put_contents( $path, $old );
 			} else {
-				@unlink( $path );
+				wp_delete_file( $path );
 			}
 			if ( function_exists( 'opcache_invalidate' ) ) {
 				@opcache_invalidate( $path, true );
 			}
-			return new WP_Error( 'nsa_rollback', 'The homepage stopped working after the change, so it was rolled back automatically. ' . ( $health['detail'] ?? '' ) );
+			return new WP_Error( 'nomadsa_rollback', 'The homepage stopped working after the change, so it was rolled back automatically. ' . ( $health['detail'] ?? '' ) );
 		}
 		return array( 'summary' => ( $exists ? 'Edited ' : 'Created ' ) . $rel, 'backup_id' => $backup_id, 'homepage_check' => $health );
 	}
@@ -992,21 +989,21 @@ class NSA_Fix_Tools {
 			$out[] = '  ' . $a[ $i ];
 		}
 		$text = implode( "\n", $out );
-		return mb_strlen( $text ) > 12000 ? mb_substr( $text, 0, 12000 ) . "\n... (diff truncated)" : NSA_Tools::redact( $text );
+		return mb_strlen( $text ) > 12000 ? mb_substr( $text, 0, 12000 ) . "\n... (diff truncated)" : NomadSA_Tools::redact( $text );
 	}
 
 	public static function set_custom_css( $args, $confirm ) {
 		$css = wp_strip_all_tags( (string) $args['css'] );
 		if ( false !== stripos( $css, '</style' ) ) {
-			return new WP_Error( 'nsa_css', 'Invalid CSS.' );
+			return new WP_Error( 'nomadsa_css', 'Invalid CSS.' );
 		}
-		$cur = (string) NSA_Settings::runtime( 'custom_css' );
+		$cur = (string) NomadSA_Settings::runtime( 'custom_css' );
 		$new = ( isset( $args['mode'] ) && 'append' === $args['mode'] ) ? trim( $cur . "\n" . $css ) : trim( $css );
 		if ( ! $confirm ) {
 			return array( 'summary' => 'Custom CSS ' . ( strlen( $new ) ) . ' characters', 'current' => $cur, 'new' => $new );
 		}
-		NSA_DB::backup( 'runtime', 'custom_css', wp_json_encode( array( 'custom_css' => $cur ) ) );
-		NSA_Settings::update_runtime( array( 'custom_css' => $new ) );
+		NomadSA_DB::backup( 'runtime', 'custom_css', wp_json_encode( array( 'custom_css' => $cur ) ) );
+		NomadSA_Settings::update_runtime( array( 'custom_css' => $new ) );
 		return array( 'summary' => 'Custom CSS saved', 'next' => 'Run flush_caches, then check the page.' );
 	}
 
@@ -1017,7 +1014,7 @@ class NSA_Fix_Tools {
 		$opt = function ( $k ) use ( $args ) {
 			return ! isset( $args[ $k ] ) || (bool) $args[ $k ];
 		};
-		$keep = NSA_Tools::int_arg( $args, 'keep_revisions', 3, 0, 50 );
+		$keep = NomadSA_Tools::int_arg( $args, 'keep_revisions', 3, 0, 50 );
 
 		$rev_ids = array();
 		if ( $opt( 'revisions' ) ) {
@@ -1095,7 +1092,7 @@ class NSA_Fix_Tools {
 			rocket_clean_domain();
 		}
 		if ( defined( 'LSCWP_V' ) ) {
-			do_action( 'litespeed_purge_all' );
+			do_action( 'litespeed_purge_all' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- LiteSpeed Cache's own purge hook.
 		}
 		if ( function_exists( 'w3tc_flush_all' ) ) {
 			w3tc_flush_all();
@@ -1113,9 +1110,9 @@ class NSA_Fix_Tools {
 	}
 
 	public static function restore_backup( $args, $confirm ) {
-		$b = NSA_DB::get_backup( (int) $args['backup_id'] );
+		$b = NomadSA_DB::get_backup( (int) $args['backup_id'] );
 		if ( ! $b ) {
-			return new WP_Error( 'nsa_backup', 'Backup not found.' );
+			return new WP_Error( 'nomadsa_backup', 'Backup not found.' );
 		}
 		if ( ! $confirm ) {
 			return array( 'summary' => 'Restore ' . $b['kind'] . ' backup of ' . $b['target'] . ' from ' . $b['created_at'] . ' UTC', 'kind' => $b['kind'], 'target' => $b['target'] );
@@ -1127,9 +1124,9 @@ class NSA_Fix_Tools {
 				if ( is_wp_error( $path ) ) {
 					return $path;
 				}
-				NSA_DB::backup( 'file', $b['target'], file_exists( $path ) ? file_get_contents( $path ) : '' );
+				NomadSA_DB::backup( 'file', $b['target'], file_exists( $path ) ? file_get_contents( $path ) : '' );
 				if ( '' === $b['content'] ) {
-					@unlink( $path ); // The file did not exist before.
+					wp_delete_file( $path ); // The file did not exist before.
 				} else {
 					file_put_contents( $path, $b['content'] );
 				}
@@ -1160,15 +1157,15 @@ class NSA_Fix_Tools {
 				break;
 			case 'option':
 				if ( ! isset( self::SITE_SETTINGS[ $b['target'] ] ) ) {
-					return new WP_Error( 'nsa_backup', 'This setting cannot be restored through the connector.' );
+					return new WP_Error( 'nomadsa_backup', 'This setting cannot be restored through the connector.' );
 				}
 				update_option( $b['target'], $data['value'] );
 				break;
 			case 'runtime':
-				NSA_Settings::update_runtime( (array) $data );
+				NomadSA_Settings::update_runtime( (array) $data );
 				break;
 			default:
-				return new WP_Error( 'nsa_backup', 'Unknown backup type.' );
+				return new WP_Error( 'nomadsa_backup', 'Unknown backup type.' );
 		}
 		return array( 'summary' => 'Restored ' . $b['target'] . ' to the version from ' . $b['created_at'] . ' UTC', 'next' => 'Run flush_caches.' );
 	}

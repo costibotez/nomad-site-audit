@@ -1,12 +1,15 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+// Queries here use the plugin's own tables or read only counts, which WordPress has no API or cache for.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 /**
  * A small OAuth 2.1 authorisation server (authorisation code with PKCE, dynamic client registration,
  * client ID metadata documents and refresh token rotation) so Claude can connect as a custom connector.
  * Only administrators can approve a connection.
  */
-class NSA_OAuth {
+class NomadSA_OAuth {
 
 	public static $current_client = '';
 	public static $current_scope  = array();
@@ -17,7 +20,7 @@ class NSA_OAuth {
 
 	public static function protected_resource_metadata() {
 		return array(
-			'resource'                 => NSA_Settings::mcp_url(),
+			'resource'                 => NomadSA_Settings::mcp_url(),
 			'authorization_servers'    => array( self::issuer() ),
 			'scopes_supported'         => array( 'audit', 'fix' ),
 			'bearer_methods_supported' => array( 'header' ),
@@ -43,42 +46,42 @@ class NSA_OAuth {
 	/* ---------------------------------------------------------------- Clients */
 
 	public static function register() {
-		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
-			NSA_HTTP::oauth_error( 'invalid_request', 'Use POST.', 405 );
+		if ( 'POST' !== NomadSA_HTTP::method() ) {
+			NomadSA_HTTP::oauth_error( 'invalid_request', 'Use POST.', 405 );
 		}
-		if ( ! NSA_Settings::get( 'enabled' ) ) {
-			NSA_HTTP::oauth_error( 'access_denied', 'The connector is switched off on this site.', 403 );
+		if ( ! NomadSA_Settings::get( 'enabled' ) ) {
+			NomadSA_HTTP::oauth_error( 'access_denied', 'The connector is switched off on this site.', 403 );
 		}
-		if ( ! NSA_Settings::connect_window_open() ) {
-			NSA_HTTP::oauth_error( 'access_denied', 'New connections are closed. In WordPress, go to Settings, Nomad Site Audit and click "Allow a new connection", then try again within 15 minutes.', 403 );
+		if ( ! NomadSA_Settings::connect_window_open() ) {
+			NomadSA_HTTP::oauth_error( 'access_denied', 'New connections are closed. In WordPress, go to Settings, Nomad Site Audit and click "Allow a new connection", then try again within 15 minutes.', 403 );
 		}
 		// At most 10 registrations an hour, and forget registrations that never connected.
-		$count = (int) get_transient( 'nsa_register_count' );
+		$count = (int) get_transient( 'nomadsa_register_count' );
 		if ( $count >= 10 ) {
-			NSA_HTTP::oauth_error( 'access_denied', 'Too many registrations. Try again in an hour.', 429 );
+			NomadSA_HTTP::oauth_error( 'access_denied', 'Too many registrations. Try again in an hour.', 429 );
 		}
-		set_transient( 'nsa_register_count', $count + 1, HOUR_IN_SECONDS );
+		set_transient( 'nomadsa_register_count', $count + 1, HOUR_IN_SECONDS );
 		self::prune_clients();
-		$data = NSA_HTTP::body_params();
+		$data = NomadSA_HTTP::body_params();
 		$uris = isset( $data['redirect_uris'] ) && is_array( $data['redirect_uris'] ) ? array_values( array_filter( $data['redirect_uris'], 'is_string' ) ) : array();
 		if ( empty( $uris ) ) {
-			NSA_HTTP::oauth_error( 'invalid_redirect_uri', 'At least one redirect URI is required.' );
+			NomadSA_HTTP::oauth_error( 'invalid_redirect_uri', 'At least one redirect URI is required.' );
 		}
 		foreach ( $uris as $uri ) {
 			if ( ! self::redirect_allowed( $uri ) ) {
-				NSA_HTTP::oauth_error( 'invalid_redirect_uri', 'Redirect URI not allowed by this site: ' . $uri );
+				NomadSA_HTTP::oauth_error( 'invalid_redirect_uri', 'Redirect URI not allowed by this site: ' . $uri );
 			}
 		}
 		global $wpdb;
-		$client_id = 'nsa_' . wp_generate_password( 32, false, false );
+		$client_id = 'nomadsa_' . wp_generate_password( 32, false, false );
 		$name      = isset( $data['client_name'] ) ? sanitize_text_field( $data['client_name'] ) : 'Unnamed app';
-		$wpdb->insert( NSA_DB::table( 'clients' ), array(
+		$wpdb->insert( NomadSA_DB::table( 'clients' ), array(
 			'client_id'     => $client_id,
 			'client_name'   => mb_substr( $name, 0, 200 ),
 			'redirect_uris' => wp_json_encode( $uris ),
-			'created_at'    => NSA_DB::now(),
+			'created_at'    => NomadSA_DB::now(),
 		) );
-		NSA_HTTP::json( array(
+		NomadSA_HTTP::json( array(
 			'client_id'                  => $client_id,
 			'client_id_issued_at'        => time(),
 			'client_name'                => $name,
@@ -92,11 +95,11 @@ class NSA_OAuth {
 	/** Removes registered apps older than a day that never received a token. */
 	public static function prune_clients() {
 		global $wpdb;
-		$c = NSA_DB::table( 'clients' );
-		$t = NSA_DB::table( 'tokens' );
 		$wpdb->query( $wpdb->prepare(
-			"DELETE FROM $c WHERE created_at < %s AND client_id NOT IN ( SELECT DISTINCT client_id FROM $t )",
-			gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS )
+			'DELETE FROM %i WHERE created_at < %s AND client_id NOT IN ( SELECT DISTINCT client_id FROM %i )',
+			NomadSA_DB::table( 'clients' ),
+			gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS ),
+			NomadSA_DB::table( 'tokens' )
 		) );
 	}
 
@@ -109,7 +112,7 @@ class NSA_OAuth {
 			return self::get_metadata_client( $client_id );
 		}
 		global $wpdb;
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . NSA_DB::table( 'clients' ) . ' WHERE client_id = %s', $client_id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE client_id = %s', NomadSA_DB::table( 'clients' ), $client_id ), ARRAY_A );
 		if ( ! $row ) {
 			return null;
 		}
@@ -125,7 +128,7 @@ class NSA_OAuth {
 		if ( ! self::host_allowed( $host ) ) {
 			return null;
 		}
-		$key    = 'nsa_cimd_' . md5( $url );
+		$key    = 'nomadsa_cimd_' . md5( $url );
 		$cached = get_transient( $key );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -148,7 +151,7 @@ class NSA_OAuth {
 
 	public static function host_allowed( $host ) {
 		$host = strtolower( (string) $host );
-		foreach ( NSA_Settings::allowed_hosts() as $allowed ) {
+		foreach ( NomadSA_Settings::allowed_hosts() as $allowed ) {
 			if ( $host === $allowed || ( strlen( $host ) > strlen( $allowed ) && substr( $host, -strlen( $allowed ) - 1 ) === '.' . $allowed ) ) {
 				return true;
 			}
@@ -175,10 +178,12 @@ class NSA_OAuth {
 		nocache_headers();
 		$p = array();
 		foreach ( array( 'response_type', 'client_id', 'redirect_uri', 'state', 'scope', 'code_challenge', 'code_challenge_method', 'resource' ) as $k ) {
-			$p[ $k ] = isset( $_REQUEST[ $k ] ) ? (string) wp_unslash( $_REQUEST[ $k ] ) : '';
+			// Authorisation request parameters arrive from Claude in the address; the approval form below has its own nonce.
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$p[ $k ] = isset( $_REQUEST[ $k ] ) ? sanitize_text_field( wp_unslash( $_REQUEST[ $k ] ) ) : '';
 		}
 
-		if ( ! NSA_Settings::get( 'enabled' ) ) {
+		if ( ! NomadSA_Settings::get( 'enabled' ) ) {
 			self::page( 'Connector switched off', '<p>The Claude connector is switched off on this site. An administrator can switch it on under Settings, Nomad Site Audit.</p>' );
 		}
 
@@ -204,16 +209,16 @@ class NSA_OAuth {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			self::page( 'Administrator required', '<p>Only an administrator can connect this site to Claude.</p>' );
 		}
-		if ( ! NSA_Settings::connect_window_open() ) {
+		if ( ! NomadSA_Settings::connect_window_open() ) {
 			self::page( 'New connections are closed', '<p>For safety, this site only accepts a new connection for 15 minutes after an administrator allows it.</p><p>If you started this connection yourself, go to <a href="' . esc_url( admin_url( 'options-general.php?page=nomad-site-audit' ) ) . '">Settings, Nomad Site Audit</a>, click <strong>Allow a new connection</strong>, then connect again from Claude.</p><p class="note">If you did not start this, someone may be trying to get access to your site. Close this page.</p>' );
 		}
 
-		$fixes_on  = NSA_Settings::fixes_active();
+		$fixes_on  = NomadSA_Settings::fixes_active();
 		$requested = array_filter( explode( ' ', $p['scope'] ) );
 		$want_fix  = empty( $requested ) || in_array( 'fix', $requested, true );
 
-		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
-			check_admin_referer( 'nsa_authorize' );
+		if ( 'POST' === NomadSA_HTTP::method() ) {
+			check_admin_referer( 'nomadsa_authorize' );
 			if ( empty( $_POST['approve'] ) ) {
 				self::redirect_error( $p, 'access_denied', 'The administrator declined the connection.' );
 			}
@@ -222,7 +227,7 @@ class NSA_OAuth {
 				$scope[] = 'fix';
 			}
 			$code = wp_generate_password( 48, false, false );
-			set_transient( 'nsa_code_' . hash( 'sha256', $code ), array(
+			set_transient( 'nomadsa_code_' . hash( 'sha256', $code ), array(
 				'client_id'      => $p['client_id'],
 				'redirect_uri'   => $p['redirect_uri'],
 				'code_challenge' => $p['code_challenge'],
@@ -230,7 +235,7 @@ class NSA_OAuth {
 				'scope'          => implode( ' ', $scope ),
 			), 10 * MINUTE_IN_SECONDS );
 			// One approval per window: close it so a second request needs a new decision.
-			NSA_Settings::update( array( 'connect_until' => 0 ) );
+			NomadSA_Settings::update( array( 'connect_until' => 0 ) );
 			self::redirect_to_client( $p['redirect_uri'], array(
 				'code'  => $code,
 				'state' => $p['state'],
@@ -243,7 +248,7 @@ class NSA_OAuth {
 		$back  = esc_html( wp_parse_url( $p['redirect_uri'], PHP_URL_HOST ) );
 		$site  = esc_html( get_bloginfo( 'name' ) );
 		$html  = '<p><strong>' . $app . '</strong> (' . $back . ') wants to connect to <strong>' . $site . '</strong> as ' . esc_html( $user->user_login ) . '.</p>';
-		$html .= '<form method="post">' . wp_nonce_field( 'nsa_authorize', '_wpnonce', true, false );
+		$html .= '<form method="post">' . wp_nonce_field( 'nomadsa_authorize', '_wpnonce', true, false );
 		$html .= '<div class="scope"><label><input type="checkbox" checked disabled> <strong>Audit</strong>: read settings, plugins, content and code to check security, search and site health. Secret keys and passwords are never shared.</label></div>';
 		if ( $fixes_on && $want_fix ) {
 			$html .= '<div class="scope"><label><input type="checkbox" name="grant_fix" value="1" checked> <strong>Fix</strong>: apply changes such as updates, security settings and search titles. Each change is previewed first, logged and backed up where possible.</label></div>';
@@ -261,8 +266,14 @@ class NSA_OAuth {
 			return '' !== $v && null !== $v;
 		} );
 		$sep = ( false === strpos( $uri, '?' ) ) ? '?' : '&';
-		// wp_redirect, not wp_safe_redirect: the client is external and was validated above.
-		wp_redirect( $uri . $sep . http_build_query( $params ) );
+		// The return address was checked against the registered app and the allowed list above,
+		// so add its host to the safe list for this one redirect.
+		$host = (string) wp_parse_url( $uri, PHP_URL_HOST );
+		add_filter( 'allowed_redirect_hosts', function ( $hosts ) use ( $host ) {
+			$hosts[] = $host;
+			return $hosts;
+		} );
+		wp_safe_redirect( $uri . $sep . http_build_query( $params ) );
 		exit;
 	}
 
@@ -273,6 +284,19 @@ class NSA_OAuth {
 			'state'             => $p['state'],
 			'iss'               => self::issuer(),
 		) );
+	}
+
+	private static function page_allowed_html() {
+		return array(
+			'p'      => array( 'class' => true ),
+			'strong' => array(),
+			'a'      => array( 'href' => true ),
+			'div'    => array( 'class' => true ),
+			'label'  => array(),
+			'form'   => array( 'method' => true ),
+			'input'  => array( 'type' => true, 'name' => true, 'value' => true, 'id' => true, 'checked' => true, 'disabled' => true ),
+			'button' => array( 'class' => true, 'name' => true, 'value' => true ),
+		);
 	}
 
 	private static function page( $title, $body ) {
@@ -286,70 +310,70 @@ class NSA_OAuth {
 			h1{font-size:20px;margin:0 0 16px}.scope{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:10px 0}
 			button{font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
 			button.primary{background:#2563eb;border-color:#2563eb;color:#fff}.note{color:#6b7280;font-size:14px}
-		</style></head><body><div class="box"><h1>' . esc_html( $title ) . '</h1>' . $body . '</div></body></html>';
+		</style></head><body><div class="box"><h1>' . esc_html( $title ) . '</h1>' . wp_kses( $body, self::page_allowed_html() ) . '</div></body></html>';
 		exit;
 	}
 
 	/* ---------------------------------------------------------------- Tokens */
 
 	public static function token() {
-		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
-			NSA_HTTP::oauth_error( 'invalid_request', 'Use POST.', 405 );
+		if ( 'POST' !== NomadSA_HTTP::method() ) {
+			NomadSA_HTTP::oauth_error( 'invalid_request', 'Use POST.', 405 );
 		}
-		$d     = NSA_HTTP::body_params();
+		$d     = NomadSA_HTTP::body_params();
 		$grant = (string) ( $d['grant_type'] ?? '' );
 
 		if ( 'authorization_code' === $grant ) {
 			$code = (string) ( $d['code'] ?? '' );
-			$key  = 'nsa_code_' . hash( 'sha256', $code );
+			$key  = 'nomadsa_code_' . hash( 'sha256', $code );
 			$data = get_transient( $key );
 			delete_transient( $key ); // Single use.
 			if ( ! is_array( $data ) ) {
-				NSA_HTTP::oauth_error( 'invalid_grant', 'The code is invalid or has expired.' );
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The code is invalid or has expired.' );
 			}
 			if ( ( $d['client_id'] ?? '' ) !== $data['client_id'] || ( $d['redirect_uri'] ?? '' ) !== $data['redirect_uri'] ) {
-				NSA_HTTP::oauth_error( 'invalid_grant', 'Client or redirect URI does not match.' );
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'Client or redirect URI does not match.' );
 			}
 			$verifier  = (string) ( $d['code_verifier'] ?? '' );
 			$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 			if ( '' === $verifier || ! hash_equals( $data['code_challenge'], $challenge ) ) {
-				NSA_HTTP::oauth_error( 'invalid_grant', 'PKCE verification failed.' );
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'PKCE verification failed.' );
 			}
-			NSA_HTTP::json( self::issue_tokens( $data['client_id'], (int) $data['user_id'], $data['scope'] ) );
+			NomadSA_HTTP::json( self::issue_tokens( $data['client_id'], (int) $data['user_id'], $data['scope'] ) );
 		}
 
 		if ( 'refresh_token' === $grant ) {
 			$row = self::find_token( (string) ( $d['refresh_token'] ?? '' ), 'refresh' );
 			if ( ! $row || ( isset( $d['client_id'] ) && $d['client_id'] !== $row['client_id'] ) ) {
-				NSA_HTTP::oauth_error( 'invalid_grant', 'The refresh token is invalid or has expired.' );
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The refresh token is invalid or has expired.' );
 			}
 			global $wpdb;
-			$wpdb->update( NSA_DB::table( 'tokens' ), array( 'revoked' => 1 ), array( 'id' => $row['id'] ) ); // Rotation.
+			$wpdb->update( NomadSA_DB::table( 'tokens' ), array( 'revoked' => 1 ), array( 'id' => $row['id'] ) ); // Rotation.
 			// The fix scope is kept; whether fixes work is decided on every call by the 24 hour switch.
-			NSA_HTTP::json( self::issue_tokens( $row['client_id'], (int) $row['user_id'], $row['scope'] ) );
+			NomadSA_HTTP::json( self::issue_tokens( $row['client_id'], (int) $row['user_id'], $row['scope'] ) );
 		}
 
-		NSA_HTTP::oauth_error( 'unsupported_grant_type', 'Unsupported grant type.' );
+		NomadSA_HTTP::oauth_error( 'unsupported_grant_type', 'Unsupported grant type.' );
 	}
 
 	private static function issue_tokens( $client_id, $user_id, $scope ) {
 		global $wpdb;
-		$access  = 'nsa_at_' . wp_generate_password( 48, false, false );
-		$refresh = 'nsa_rt_' . wp_generate_password( 48, false, false );
-		$life    = (int) NSA_Settings::get( 'token_lifetime' );
-		foreach ( array( array( $access, 'access', $life ), array( $refresh, 'refresh', (int) NSA_Settings::get( 'refresh_lifetime' ) ) ) as $t ) {
-			$wpdb->insert( NSA_DB::table( 'tokens' ), array(
+		$access  = 'nomadsa_at_' . wp_generate_password( 48, false, false );
+		$refresh = 'nomadsa_rt_' . wp_generate_password( 48, false, false );
+		$life    = (int) NomadSA_Settings::get( 'token_lifetime' );
+		foreach ( array( array( $access, 'access', $life ), array( $refresh, 'refresh', (int) NomadSA_Settings::get( 'refresh_lifetime' ) ) ) as $t ) {
+			$wpdb->insert( NomadSA_DB::table( 'tokens' ), array(
 				'token_hash' => hash( 'sha256', $t[0] ),
 				'kind'       => $t[1],
 				'client_id'  => $client_id,
 				'user_id'    => $user_id,
 				'scope'      => $scope,
 				'expires_at' => gmdate( 'Y-m-d H:i:s', time() + $t[2] ),
-				'created_at' => NSA_DB::now(),
+				'created_at' => NomadSA_DB::now(),
 			) );
 		}
 		// Housekeeping: remove long expired tokens.
-		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . NSA_DB::table( 'tokens' ) . ' WHERE expires_at < %s', gmdate( 'Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS ) ) );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE expires_at < %s', NomadSA_DB::table( 'tokens' ), gmdate( 'Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS ) ) );
 		return array(
 			'access_token'  => $access,
 			'token_type'    => 'Bearer',
@@ -365,18 +389,18 @@ class NSA_OAuth {
 		}
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare(
-			'SELECT * FROM ' . NSA_DB::table( 'tokens' ) . ' WHERE token_hash = %s AND kind = %s AND revoked = 0 AND expires_at > %s',
-			hash( 'sha256', $token ), $kind, NSA_DB::now()
+			'SELECT * FROM %i WHERE token_hash = %s AND kind = %s AND revoked = 0 AND expires_at > %s',
+			NomadSA_DB::table( 'tokens' ), hash( 'sha256', $token ), $kind, NomadSA_DB::now()
 		), ARRAY_A );
 		return $row ?: null;
 	}
 
 	/** Validates the Bearer token on an MCP request and signs in its user. Returns true or false. */
 	public static function authenticate_request() {
-		if ( ! NSA_Settings::get( 'enabled' ) ) {
+		if ( ! NomadSA_Settings::get( 'enabled' ) ) {
 			return false;
 		}
-		$row = self::find_token( NSA_HTTP::bearer_token(), 'access' );
+		$row = self::find_token( NomadSA_HTTP::bearer_token(), 'access' );
 		if ( ! $row ) {
 			return false;
 		}
@@ -389,13 +413,13 @@ class NSA_OAuth {
 		self::$current_scope  = array_filter( explode( ' ', $row['scope'] ) );
 		if ( empty( $row['last_used_at'] ) || strtotime( $row['last_used_at'] . ' UTC' ) < time() - 300 ) {
 			global $wpdb;
-			$wpdb->update( NSA_DB::table( 'tokens' ), array( 'last_used_at' => NSA_DB::now() ), array( 'id' => $row['id'] ) );
+			$wpdb->update( NomadSA_DB::table( 'tokens' ), array( 'last_used_at' => NomadSA_DB::now() ), array( 'id' => $row['id'] ) );
 		}
 		return true;
 	}
 
 	public static function can_fix() {
-		return in_array( 'fix', self::$current_scope, true ) && NSA_Settings::fixes_active();
+		return in_array( 'fix', self::$current_scope, true ) && NomadSA_Settings::fixes_active();
 	}
 
 	/** Lists apps with active tokens for the settings page. */
@@ -403,18 +427,18 @@ class NSA_OAuth {
 		global $wpdb;
 		return $wpdb->get_results( $wpdb->prepare(
 			'SELECT client_id, user_id, MAX(scope) AS scope, MIN(created_at) AS first_seen, MAX(COALESCE(last_used_at, created_at)) AS last_used
-			 FROM ' . NSA_DB::table( 'tokens' ) . ' WHERE revoked = 0 AND expires_at > %s GROUP BY client_id, user_id ORDER BY last_used DESC',
-			NSA_DB::now()
+			 FROM %i WHERE revoked = 0 AND expires_at > %s GROUP BY client_id, user_id ORDER BY last_used DESC',
+			NomadSA_DB::table( 'tokens' ), NomadSA_DB::now()
 		), ARRAY_A );
 	}
 
 	public static function revoke_client( $client_id ) {
 		global $wpdb;
-		$wpdb->update( NSA_DB::table( 'tokens' ), array( 'revoked' => 1 ), array( 'client_id' => $client_id ) );
+		$wpdb->update( NomadSA_DB::table( 'tokens' ), array( 'revoked' => 1 ), array( 'client_id' => $client_id ) );
 	}
 
 	public static function revoke_all() {
 		global $wpdb;
-		$wpdb->query( 'UPDATE ' . NSA_DB::table( 'tokens' ) . ' SET revoked = 1' );
+		$wpdb->query( $wpdb->prepare( 'UPDATE %i SET revoked = 1', NomadSA_DB::table( 'tokens' ) ) );
 	}
 }

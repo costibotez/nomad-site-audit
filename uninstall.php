@@ -1,7 +1,7 @@
 <?php
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
-require_once __DIR__ . '/includes/class-nsa-db.php';
-require_once __DIR__ . '/includes/class-nsa-wellknown.php';
-NSA_WellKnown::remove();
-NSA_DB::uninstall();
+require_once __DIR__ . '/includes/class-nomadsa-db.php';
+require_once __DIR__ . '/includes/class-nomadsa-wellknown.php';
+NomadSA_WellKnown::remove();
+NomadSA_DB::uninstall();

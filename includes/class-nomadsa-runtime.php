@@ -4,10 +4,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Applies the fixes stored by the connector on every request: security headers, hardening and custom CSS.
  */
-class NSA_Runtime {
+class NomadSA_Runtime {
 
 	public static function init() {
-		$r = NSA_Settings::runtime();
+		$r = NomadSA_Settings::runtime();
 
 		if ( ! empty( $r['security_headers'] ) ) {
 			add_action( 'send_headers', array( __CLASS__, 'send_security_headers' ) );
@@ -30,7 +30,7 @@ class NSA_Runtime {
 		}
 
 		if ( $r['disable_file_editor'] && ! defined( 'DISALLOW_FILE_EDIT' ) ) {
-			define( 'DISALLOW_FILE_EDIT', true );
+			define( 'DISALLOW_FILE_EDIT', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the core constant that switches off the code editor.
 		}
 
 		if ( $r['hide_wp_version'] ) {
@@ -46,6 +46,7 @@ class NSA_Runtime {
 				return $endpoints;
 			} );
 			add_action( 'template_redirect', function () {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only checks whether an author enumeration request was made.
 				if ( ! is_user_logged_in() && isset( $_GET['author'] ) && is_numeric( $_GET['author'] ) ) {
 					wp_safe_redirect( home_url( '/' ), 301 );
 					exit;
@@ -73,7 +74,7 @@ class NSA_Runtime {
 		if ( headers_sent() ) {
 			return;
 		}
-		foreach ( (array) NSA_Settings::runtime( 'security_headers' ) as $name => $value ) {
+		foreach ( (array) NomadSA_Settings::runtime( 'security_headers' ) as $name => $value ) {
 			if ( 'Strict-Transport-Security' === $name && ! is_ssl() ) {
 				continue;
 			}
@@ -82,14 +83,18 @@ class NSA_Runtime {
 	}
 
 	public static function print_custom_css() {
-		echo "\n<style id=\"nsa-custom-css\">\n" . wp_strip_all_tags( (string) NSA_Settings::runtime( 'custom_css' ) ) . "\n</style>\n";
+		// CSS cannot go through esc_html (it would break selectors such as a > b); tags are stripped instead.
+		echo "\n<style id=\"nomadsa-custom-css\">\n" . wp_strip_all_tags( (string) NomadSA_Settings::runtime( 'custom_css' ) ) . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	public static function remove_core_info_files() {
 		$deleted = array();
 		foreach ( array( 'readme.html', 'license.txt' ) as $f ) {
-			if ( file_exists( ABSPATH . $f ) && @unlink( ABSPATH . $f ) ) {
-				$deleted[] = $f;
+			if ( file_exists( ABSPATH . $f ) ) {
+				wp_delete_file( ABSPATH . $f );
+				if ( ! file_exists( ABSPATH . $f ) ) {
+					$deleted[] = $f;
+				}
 			}
 		}
 		return $deleted;

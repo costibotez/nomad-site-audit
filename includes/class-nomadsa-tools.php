@@ -4,7 +4,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Tool registry. Audit tools only read. Fix tools change the site and use a preview then confirm pattern.
  */
-class NSA_Tools {
+class NomadSA_Tools {
 
 	/** @var array name => definition */
 	private static $tools = array();
@@ -24,9 +24,9 @@ class NSA_Tools {
 
 	private static function boot() {
 		if ( empty( self::$tools ) ) {
-			NSA_Audit_Tools::register();
-			NSA_Fix_Tools::register();
-			do_action( 'nsa_register_tools' );
+			NomadSA_Audit_Tools::register();
+			NomadSA_Fix_Tools::register();
+			do_action( 'nomadsa_register_tools' );
 		}
 	}
 
@@ -39,7 +39,7 @@ class NSA_Tools {
 		self::boot();
 		$out = array();
 		foreach ( self::$tools as $t ) {
-			if ( 'fix' === $t['kind'] && ! NSA_OAuth::can_fix() ) {
+			if ( 'fix' === $t['kind'] && ! NomadSA_OAuth::can_fix() ) {
 				continue;
 			}
 			$props = $t['properties'];
@@ -80,8 +80,8 @@ class NSA_Tools {
 			return self::error_result( 'Unknown tool: ' . $name );
 		}
 		$t = self::$tools[ $name ];
-		if ( 'fix' === $t['kind'] && ! NSA_OAuth::can_fix() ) {
-			NSA_DB::log( $name, 'fix', 'denied', 'Fixes are not allowed for this connection.', $args );
+		if ( 'fix' === $t['kind'] && ! NomadSA_OAuth::can_fix() ) {
+			NomadSA_DB::log( $name, 'fix', 'denied', 'Fixes are not allowed for this connection.', $args );
 			return self::error_result( 'Fixes are not allowed for this connection. An administrator can switch them on under Settings, Nomad Site Audit, then reconnect.' );
 		}
 		foreach ( $t['required'] as $req ) {
@@ -93,16 +93,15 @@ class NSA_Tools {
 		$confirm = ! empty( $args['confirm'] );
 		unset( $args['confirm'] );
 
-		@set_time_limit( 120 );
 		try {
 			$result = call_user_func( $t['callback'], $args, $confirm );
 		} catch ( \Throwable $e ) {
-			NSA_DB::log( $name, $t['kind'], 'error', $e->getMessage(), $args );
+			NomadSA_DB::log( $name, $t['kind'], 'error', $e->getMessage(), $args );
 			return self::error_result( 'The tool failed: ' . $e->getMessage() );
 		}
 
 		if ( is_wp_error( $result ) ) {
-			NSA_DB::log( $name, $t['kind'], 'error', $result->get_error_message(), $args );
+			NomadSA_DB::log( $name, $t['kind'], 'error', $result->get_error_message(), $args );
 			return self::error_result( $result->get_error_message() );
 		}
 
@@ -115,7 +114,7 @@ class NSA_Tools {
 			);
 		}
 		$summary = is_array( $result ) && isset( $result['summary'] ) ? $result['summary'] : ( is_string( $result ) ? $result : $status );
-		NSA_DB::log( $name, $t['kind'], $status, is_string( $summary ) ? $summary : $status, $args );
+		NomadSA_DB::log( $name, $t['kind'], $status, is_string( $summary ) ? $summary : $status, $args );
 
 		$text = is_string( $result ) ? $result : wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		$out  = array( 'content' => array( array( 'type' => 'text', 'text' => (string) $text ) ), 'isError' => false );
@@ -152,13 +151,13 @@ class NSA_Tools {
 		$root = wp_normalize_path( untrailingslashit( realpath( ABSPATH ) ) );
 		$rel  = ltrim( wp_normalize_path( (string) $relative ), '/' );
 		if ( false !== strpos( $rel, '..' ) ) {
-			return new WP_Error( 'nsa_path', 'Paths with .. are not allowed.' );
+			return new WP_Error( 'nomadsa_path', 'Paths with .. are not allowed.' );
 		}
 		$abs = $root . '/' . $rel;
 		if ( $must_exist ) {
 			$real = realpath( $abs );
 			if ( false === $real ) {
-				return new WP_Error( 'nsa_path', 'Path not found: ' . $rel );
+				return new WP_Error( 'nomadsa_path', 'Path not found: ' . $rel );
 			}
 		} else {
 			// The file or its folders may not exist yet: resolve the nearest existing folder.
@@ -170,16 +169,16 @@ class NSA_Tools {
 			}
 			$real = realpath( $existing );
 			if ( false === $real ) {
-				return new WP_Error( 'nsa_path', 'Path not found: ' . $rel );
+				return new WP_Error( 'nomadsa_path', 'Path not found: ' . $rel );
 			}
 			$real .= $rest;
 		}
 		$real = wp_normalize_path( $real );
 		if ( 0 !== strpos( $real . '/', $root . '/' ) ) {
-			return new WP_Error( 'nsa_path', 'Path is outside the WordPress folder.' );
+			return new WP_Error( 'nomadsa_path', 'Path is outside the WordPress folder.' );
 		}
 		if ( self::is_sensitive_path( $real ) ) {
-			return new WP_Error( 'nsa_path', 'This file is protected and cannot be accessed through the connector.' );
+			return new WP_Error( 'nomadsa_path', 'This file is protected and cannot be accessed through the connector.' );
 		}
 		return $real;
 	}
@@ -223,8 +222,8 @@ class NSA_Tools {
 			'method'      => $method,
 			'timeout'     => 15,
 			'redirection' => 3,
-			'sslverify'   => apply_filters( 'https_local_ssl_verify', true ),
-			'user-agent'  => 'NomadSiteAudit/' . NSA_VERSION . '; ' . home_url(),
+			'sslverify'   => apply_filters( 'https_local_ssl_verify', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core filter.
+			'user-agent'  => 'NomadSiteAudit/' . NOMADSA_VERSION . '; ' . home_url(),
 			'headers'     => array( 'Cache-Control' => 'no-cache' ),
 		) );
 		$ms = (int) round( ( microtime( true ) - $start ) * 1000 );
