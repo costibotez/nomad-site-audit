@@ -1,15 +1,15 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-// The plugin keeps its own tables (apps, tokens, activity log, backups), which WordPress has no API for.
+// The plugin keeps its own tables (apps, tokens, activity log, backups, audit runs and checklist), which WordPress has no API for.
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 /**
- * Database tables: registered apps, tokens, activity log and file backups.
+ * Database tables: registered apps, tokens, activity log, legacy backups, audit history and checklist.
  */
 class NomadSA_DB {
 
-	const SCHEMA_VERSION = '1';
+	const SCHEMA_VERSION = '2';
 
 	public static function table( $name ) {
 		global $wpdb;
@@ -70,6 +70,24 @@ class NomadSA_DB {
 			PRIMARY KEY  (id)
 		) $charset;" );
 
+		dbDelta( 'CREATE TABLE ' . self::table( 'audit_runs' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			source varchar(20) NOT NULL,
+			created_at datetime NOT NULL,
+			payload longtext NOT NULL,
+			PRIMARY KEY  (id),
+			KEY source_run (source,id)
+		) $charset;" );
+
+		dbDelta( 'CREATE TABLE ' . self::table( 'audit_checklist' ) . " (
+			finding_id varchar(191) NOT NULL,
+			state varchar(20) NOT NULL,
+			audit_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (finding_id),
+			KEY updated_at (updated_at)
+		) $charset;" );
+
 		update_option( 'nomadsa_schema_version', self::SCHEMA_VERSION, false );
 	}
 
@@ -87,11 +105,13 @@ class NomadSA_DB {
 		global $wpdb;
 		foreach ( array( 'clients', 'tokens', 'log', 'backups' ) as $t ) {
 			$old = $wpdb->prefix . 'nsa_' . $t;
-			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old ) ) ) {
+			if ( $old !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $old ) ) ) ) {
 				continue;
 			}
 			// The new tables have exactly the same columns as the old ones.
-			$wpdb->query( $wpdb->prepare( 'INSERT INTO %i SELECT * FROM %i', self::table( $t ), $old ) );
+			if ( false === $wpdb->query( $wpdb->prepare( 'INSERT INTO %i SELECT * FROM %i', self::table( $t ), $old ) ) ) {
+				return;
+			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange -- removes the plugin's own old table after copying.
 			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $old ) );
 		}
@@ -109,21 +129,17 @@ class NomadSA_DB {
 		return gmdate( 'Y-m-d H:i:s' );
 	}
 
-	public static function log( $tool, $kind, $status, $summary, $args = array() ) {
+	public static function log( $tool, $kind, $status, $summary ) {
 		global $wpdb;
-		$json = wp_json_encode( $args );
-		if ( strlen( $json ) > 20000 ) {
-			$json = substr( $json, 0, 20000 ) . '... (truncated)';
-		}
 		$wpdb->insert( self::table( 'log' ), array(
 			'created_at' => self::now(),
-			'user_id'    => get_current_user_id(),
+			'user_id'    => NomadSA_OAuth::$current_user_id ?: get_current_user_id(),
 			'client_id'  => NomadSA_OAuth::$current_client,
 			'tool'       => $tool,
 			'kind'       => $kind,
 			'status'     => $status,
-			'summary'    => mb_substr( (string) $summary, 0, 2000 ),
-			'args'       => (string) $json,
+			'summary'    => wp_html_excerpt( NomadSA_Tools::redact( $summary ), 2000 ),
+			'args'       => '[]',
 		) );
 		// Keep the log to a sensible size.
 		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', self::table( 'log' ) ) );
@@ -132,33 +148,13 @@ class NomadSA_DB {
 		}
 	}
 
-	public static function backup( $kind, $target, $content ) {
-		global $wpdb;
-		$wpdb->insert( self::table( 'backups' ), array(
-			'created_at' => self::now(),
-			'kind'       => $kind,
-			'target'     => $target,
-			'content'    => base64_encode( gzcompress( (string) $content, 6 ) ),
-		) );
-		return (int) $wpdb->insert_id;
-	}
-
-	public static function get_backup( $id ) {
-		global $wpdb;
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', self::table( 'backups' ), $id ), ARRAY_A );
-		if ( $row ) {
-			$row['content'] = gzuncompress( base64_decode( $row['content'] ) );
-		}
-		return $row;
-	}
-
 	public static function uninstall() {
 		global $wpdb;
-		foreach ( array( 'clients', 'tokens', 'log', 'backups' ) as $t ) {
+		foreach ( array( 'clients', 'tokens', 'log', 'backups', 'audit_runs', 'audit_checklist' ) as $t ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables on uninstall.
 			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', self::table( $t ) ) );
 		}
-		foreach ( array( 'nomadsa_schema_version', 'nomadsa_settings', 'nomadsa_runtime', 'nomadsa_wellknown' ) as $o ) {
+		foreach ( array( 'nomadsa_schema_version', 'nomadsa_settings', 'nomadsa_runtime', 'nomadsa_wellknown', 'nomadsa_connect_until', 'nomadsa_audit_config', 'nomadsa_audit_baseline', 'nomadsa_audit_delivery', 'nomadsa_job_lock_audit', 'nomadsa_job_lock_performance' ) as $o ) {
 			delete_option( $o );
 		}
 	}

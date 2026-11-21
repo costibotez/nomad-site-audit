@@ -2,126 +2,131 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Tool registry. Audit tools only read. Fix tools change the site and use a preview then confirm pattern.
+ * Registry for the connector's built-in read-only tools.
  */
 class NomadSA_Tools {
 
-	/** @var array name => definition */
 	private static $tools = array();
 
-	public static function register( $name, array $def ) {
-		$def['name'] = $name;
-		$def += array(
-			'kind'        => 'audit',
-			'title'       => $name,
-			'description' => '',
-			'properties'  => array(),
-			'required'    => array(),
-			'destructive' => false,
-		);
-		self::$tools[ $name ] = $def;
-	}
-
-	private static function boot() {
+	private static function all() {
 		if ( empty( self::$tools ) ) {
-			NomadSA_Audit_Tools::register();
-			NomadSA_Fix_Tools::register();
-			do_action( 'nomadsa_register_tools' );
+			self::$tools = NomadSA_Audit_Tools::definitions();
 		}
-	}
-
-	public static function all() {
-		self::boot();
 		return self::$tools;
 	}
 
 	public static function list_for_client() {
-		self::boot();
 		$out = array();
-		foreach ( self::$tools as $t ) {
-			if ( 'fix' === $t['kind'] && ! NomadSA_OAuth::can_fix() ) {
-				continue;
-			}
-			$props = $t['properties'];
-			if ( 'fix' === $t['kind'] ) {
-				$props['confirm'] = array(
-					'type'        => 'boolean',
-					'description' => 'Leave out or false to get a preview. Set true only after the user has approved this exact change.',
-				);
-			}
-			$schema = array( 'type' => 'object', 'properties' => empty( $props ) ? new stdClass() : $props );
-			if ( ! empty( $t['required'] ) ) {
-				$schema['required'] = $t['required'];
-			}
-			$description = $t['description'];
-			if ( 'fix' === $t['kind'] ) {
-				$description .= ' Changes the live site: call without confirm first, show the preview to the user, then call with confirm true once they approve.';
+		foreach ( self::all() as $name => $tool ) {
+			$props = $tool['properties'] ?? array();
+			$schema = array(
+				'type'                 => 'object',
+				'properties'           => $props ?: new stdClass(),
+				'additionalProperties' => false,
+			);
+			if ( ! empty( $tool['required'] ) ) {
+				$schema['required'] = $tool['required'];
 			}
 			$out[] = array(
-				'name'        => $t['name'],
-				'title'       => $t['title'],
-				'description' => $description,
+				'name'        => $name,
+				'title'       => $tool['title'],
+				'description' => $tool['description'],
 				'inputSchema' => $schema,
-				'annotations' => array(
-					'title'           => $t['title'],
-					'readOnlyHint'    => 'audit' === $t['kind'],
-					'destructiveHint' => 'fix' === $t['kind'] && $t['destructive'],
-					'idempotentHint'  => 'audit' === $t['kind'],
-					'openWorldHint'   => false,
-				),
+				'annotations' => array( 'readOnlyHint' => true ),
 			);
 		}
 		return $out;
 	}
 
 	public static function call( $name, array $args ) {
-		self::boot();
-		if ( ! isset( self::$tools[ $name ] ) ) {
-			return self::error_result( 'Unknown tool: ' . $name );
+		$tool = self::all()[ $name ] ?? null;
+		if ( ! $tool ) {
+			return self::error_result( 'Unknown tool.' );
 		}
-		$t = self::$tools[ $name ];
-		if ( 'fix' === $t['kind'] && ! NomadSA_OAuth::can_fix() ) {
-			NomadSA_DB::log( $name, 'fix', 'denied', 'Fixes are not allowed for this connection.', $args );
-			return self::error_result( 'Fixes are not allowed for this connection. An administrator can switch them on under Settings, Nomad Site Audit, then reconnect.' );
-		}
-		foreach ( $t['required'] as $req ) {
-			if ( ! array_key_exists( $req, $args ) ) {
-				return self::error_result( 'Missing required argument: ' . $req );
+		foreach ( $tool['required'] ?? array() as $key ) {
+			if ( ! array_key_exists( $key, $args ) ) {
+				return self::error_result( 'Missing required argument: ' . $key );
 			}
 		}
-
-		$confirm = ! empty( $args['confirm'] );
-		unset( $args['confirm'] );
+		$clean = array();
+		foreach ( $args as $key => $value ) {
+			if ( ! isset( $tool['properties'][ $key ] ) ) {
+				return self::error_result( 'Unexpected argument.' );
+			}
+			$schema = $tool['properties'][ $key ];
+			$value = self::sanitize_argument( $key, $value, $schema );
+			if ( is_wp_error( $value ) ) {
+				return self::error_result( 'Invalid argument: ' . $key );
+			}
+			$clean[ $key ] = $value;
+		}
 
 		try {
-			$result = call_user_func( $t['callback'], $args, $confirm );
-		} catch ( \Throwable $e ) {
-			NomadSA_DB::log( $name, $t['kind'], 'error', $e->getMessage(), $args );
-			return self::error_result( 'The tool failed: ' . $e->getMessage() );
+			$result = call_user_func( $tool['callback'], $clean );
+		} catch ( Throwable $error ) {
+			NomadSA_DB::log( $name, 'audit', 'error', 'Tool execution failed.' );
+			return self::error_result( 'The tool could not complete the audit.' );
 		}
 
 		if ( is_wp_error( $result ) ) {
-			NomadSA_DB::log( $name, $t['kind'], 'error', $result->get_error_message(), $args );
+			NomadSA_DB::log( $name, 'audit', 'error', $result->get_error_code() );
 			return self::error_result( $result->get_error_message() );
 		}
 
-		$status = 'audit' === $t['kind'] ? 'read' : ( $confirm ? 'applied' : 'preview' );
-		if ( 'fix' === $t['kind'] && ! $confirm ) {
-			$result = array(
-				'preview'      => true,
-				'changes'      => $result,
-				'next_step'    => 'Nothing has changed yet. Show this preview to the user and call again with confirm true only if they approve.',
-			);
-		}
-		$summary = is_array( $result ) && isset( $result['summary'] ) ? $result['summary'] : ( is_string( $result ) ? $result : $status );
-		NomadSA_DB::log( $name, $t['kind'], $status, is_string( $summary ) ? $summary : $status, $args );
-
+		NomadSA_DB::log( $name, 'audit', 'read', 'Audit completed.' );
 		$text = is_string( $result ) ? $result : wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-		$out  = array( 'content' => array( array( 'type' => 'text', 'text' => (string) $text ) ), 'isError' => false );
+		$out = array(
+			'content' => array( array( 'type' => 'text', 'text' => (string) $text ) ),
+			'isError' => false,
+		);
 		if ( is_array( $result ) ) {
 			$out['structuredContent'] = $result;
 		}
 		return $out;
+	}
+
+	private static function sanitize_argument( $key, $value, array $schema ) {
+		$invalid = new WP_Error( 'nomadsa_argument' );
+		switch ( $schema['type'] ) {
+			case 'boolean':
+				return is_bool( $value ) ? $value : $invalid;
+			case 'integer':
+				return is_int( $value ) ? $value : $invalid;
+			case 'array':
+				if ( ! is_array( $value ) || count( $value ) > 50 ) {
+					return $invalid;
+				}
+				$items = array();
+				foreach ( $value as $item ) {
+					$item = self::sanitize_argument( $key, $item, $schema['items'] );
+					if ( is_wp_error( $item ) ) {
+						return $invalid;
+					}
+					$items[] = $item;
+				}
+				return $items;
+			case 'string':
+				if ( ! is_string( $value ) || strlen( $value ) > 2048 || preg_match( '/[[:cntrl:]]/', $value ) ) {
+					return $invalid;
+				}
+				if ( isset( $schema['enum'] ) && ! in_array( $value, $schema['enum'], true ) ) {
+					return $invalid;
+				}
+				// Paths and code search patterns are literal strings. Their consumers validate path
+				// containment and regex syntax respectively, so preserve their punctuation.
+				if ( 'path' === $key || 'pattern' === $key ) {
+					return wp_check_invalid_utf8( $value ) === $value ? $value : $invalid;
+				}
+				if ( 'url' === $key ) {
+					$url = esc_url_raw( $value, array( 'http', 'https' ) );
+					return '' !== $value && '' === $url ? $invalid : $url;
+				}
+				if ( in_array( $key, array( 'plugin', 'post_type', 'post_types', 'status', 'role', 'extensions' ), true ) ) {
+					return sanitize_key( $value );
+				}
+				return sanitize_text_field( $value );
+		}
+		return $invalid;
 	}
 
 	public static function error_result( $message ) {
@@ -130,14 +135,14 @@ class NomadSA_Tools {
 
 	/* ---------------------------------------------------------------- Shared helpers */
 
-	/** Paths that must never be read or written through the connector. */
+	/** Paths protected from connector file inspection. */
 	public static function is_sensitive_path( $path ) {
 		$base = strtolower( basename( $path ) );
-		$deny = array( 'wp-config.php', 'wp-config-sample.php', '.env', '.htpasswd', '.user.ini', 'php.ini', 'auth.json', 'id_rsa', 'id_ed25519', '.my.cnf' );
-		if ( in_array( $base, $deny, true ) || 0 === strpos( $base, '.env' ) ) {
+		$deny = array( 'wp-config.php', 'wp-config-sample.php', '.env', '.htpasswd', '.htaccess', '.user.ini', 'php.ini', 'auth.json', 'id_rsa', 'id_ed25519', '.my.cnf' );
+		if ( in_array( $base, $deny, true ) || 0 === strpos( $base, '.env' ) || 0 === strpos( $base, 'wp-config.php.' ) ) {
 			return true;
 		}
-		if ( preg_match( '/\.(sql|sql\.gz|key|pem|p12|pfx|crt|sqlite|db|bak|zip|tar|gz|7z|rar|log\.\d+)$/i', $base ) ) {
+		if ( preg_match( '/\.(sql|sql\.gz|key|pem|p12|pfx|crt|sqlite|db|bak|zip|tar|gz|7z|rar|log|log\.\d+)$/i', $base ) ) {
 			return true;
 		}
 		if ( preg_match( '#/(\.git|\.ssh|node_modules|updraft|backups?|ai1wm-backups)(/|$)#i', $path ) ) {
@@ -146,46 +151,72 @@ class NomadSA_Tools {
 		return false;
 	}
 
-	/** Resolves a path relative to the WordPress root and keeps it inside. Returns absolute path or WP_Error. */
-	public static function resolve_path( $relative, $must_exist = true ) {
-		$root = wp_normalize_path( untrailingslashit( realpath( ABSPATH ) ) );
-		$rel  = ltrim( wp_normalize_path( (string) $relative ), '/' );
-		if ( false !== strpos( $rel, '..' ) ) {
-			return new WP_Error( 'nomadsa_path', 'Paths with .. are not allowed.' );
+	/** Configured filesystem locations, with aliases for roots outside WordPress. */
+	private static function path_roots() {
+		return array(
+			'@content'      => WP_CONTENT_DIR,
+			'@uploads'      => wp_get_upload_dir()['basedir'],
+			'@plugins'      => WP_PLUGIN_DIR,
+			'@mu-plugins'   => WPMU_PLUGIN_DIR,
+			'@theme'        => get_stylesheet_directory(),
+			'@parent-theme' => get_template_directory(),
+			''              => ABSPATH,
+		);
+	}
+
+	public static function within( $path, $root ) {
+		$root = untrailingslashit( wp_normalize_path( $root ) );
+		return 0 === strpos( untrailingslashit( wp_normalize_path( $path ) ) . '/', $root . '/' );
+	}
+
+	/** Resolves an existing read-only path and checks both its spelling and its real location. */
+	public static function resolve_path( $relative ) {
+		$rel = trim( wp_normalize_path( $relative ), '/' );
+		if ( preg_match( '#(?:^|/)\.\.(?:/|$)|[[:cntrl:]:]#', $rel ) ) {
+			return new WP_Error( 'nomadsa_path', 'Invalid relative path.' );
 		}
-		$abs = $root . '/' . $rel;
-		if ( $must_exist ) {
-			$real = realpath( $abs );
-			if ( false === $real ) {
-				return new WP_Error( 'nomadsa_path', 'Path not found: ' . $rel );
-			}
+
+		$roots = self::path_roots();
+		$alias = explode( '/', $rel, 2 )[0];
+		if ( '' !== $alias && isset( $roots[ $alias ] ) ) {
+			$rel = ltrim( substr( $rel, strlen( $alias ) ), '/' );
 		} else {
-			// The file or its folders may not exist yet: resolve the nearest existing folder.
-			$existing = $abs;
-			$rest     = '';
-			while ( ! file_exists( $existing ) && strlen( $existing ) > strlen( $root ) ) {
-				$rest     = '/' . basename( $existing ) . $rest;
-				$existing = dirname( $existing );
-			}
-			$real = realpath( $existing );
-			if ( false === $real ) {
-				return new WP_Error( 'nomadsa_path', 'Path not found: ' . $rel );
-			}
-			$real .= $rest;
+			$alias = '';
 		}
-		$real = wp_normalize_path( $real );
-		if ( 0 !== strpos( $real . '/', $root . '/' ) ) {
-			return new WP_Error( 'nomadsa_path', 'Path is outside the WordPress folder.' );
+		$root = realpath( $roots[ $alias ] );
+		if ( false === $root ) {
+			return new WP_Error( 'nomadsa_path', 'The configured directory does not exist.' );
 		}
-		if ( self::is_sensitive_path( $real ) ) {
-			return new WP_Error( 'nomadsa_path', 'This file is protected and cannot be accessed through the connector.' );
+
+		$requested = trailingslashit( wp_normalize_path( $root ) ) . $rel;
+		$real = realpath( $requested );
+		if ( false === $real ) {
+			return new WP_Error( 'nomadsa_path', 'Path not found.' );
 		}
-		return $real;
+		if ( ! self::within( $real, $root ) || self::is_sensitive_path( $requested ) || self::is_sensitive_path( $real ) ) {
+			return new WP_Error( 'nomadsa_path', 'This path is protected.' );
+		}
+		return wp_normalize_path( $real );
 	}
 
 	public static function relative( $abs ) {
-		$root = wp_normalize_path( untrailingslashit( realpath( ABSPATH ) ) );
-		return ltrim( substr( wp_normalize_path( $abs ), strlen( $root ) ), '/' );
+		$path = wp_normalize_path( realpath( $abs ) ?: $abs );
+		$roots = self::path_roots();
+		// Preserve WordPress-relative paths where possible, otherwise pick the most specific alias.
+		uksort( $roots, function ( $a, $b ) use ( $roots ) {
+			if ( '' === $a || '' === $b ) {
+				return (int) ( '' === $b ) - (int) ( '' === $a );
+			}
+			return strlen( $roots[ $b ] ) <=> strlen( $roots[ $a ] );
+		} );
+		foreach ( $roots as $alias => $dir ) {
+			$root = realpath( $dir );
+			if ( false !== $root && self::within( $path, $root ) ) {
+				$rel = ltrim( substr( $path, strlen( wp_normalize_path( $root ) ) ), '/' );
+				return trim( $alias . '/' . $rel, '/' );
+			}
+		}
+		return basename( $path );
 	}
 
 	/**
@@ -216,13 +247,12 @@ class NomadSA_Tools {
 		return max( $min, min( $max, $v ) );
 	}
 
-	public static function fetch( $url, $method = 'GET' ) {
+	public static function fetch( $url, $method = 'GET', $timeout = 15 ) {
 		$start = microtime( true );
-		$res   = wp_remote_request( $url, array(
+		$res   = wp_safe_remote_request( $url, array(
 			'method'      => $method,
-			'timeout'     => 15,
+			'timeout'     => $timeout,
 			'redirection' => 3,
-			'sslverify'   => apply_filters( 'https_local_ssl_verify', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core filter.
 			'user-agent'  => 'NomadSiteAudit/' . NOMADSA_VERSION . '; ' . home_url(),
 			'headers'     => array( 'Cache-Control' => 'no-cache' ),
 		) );

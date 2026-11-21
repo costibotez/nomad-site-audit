@@ -9,62 +9,63 @@ defined( 'ABSPATH' ) || exit;
  */
 class NomadSA_Audit_Tools {
 
-	public static function register() {
+	public static function definitions() {
 		$c = __CLASS__;
+		$tools = array();
 
-		NomadSA_Tools::register( 'site_overview', array(
+		$tools[ 'site_overview' ] = array(
 			'title'       => 'Site overview',
 			'description' => 'Summary of the site: WordPress and PHP versions, server, theme, plugins, pending updates, users, key settings and which security, search, cache and backup plugins are in use. Start here.',
 			'callback'    => array( $c, 'site_overview' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'list_plugins', array(
+		$tools[ 'list_plugins' ] = array(
 			'title'       => 'List plugins',
 			'description' => 'All installed plugins with version, active state, available update, WordPress.org status (last updated, closed or abandoned) and known vulnerabilities when a WPScan token is set in the plugin settings.',
 			'properties'  => array(
 				'check_directory' => array( 'type' => 'boolean', 'description' => 'Look up each plugin on WordPress.org. Default true.' ),
 			),
 			'callback'    => array( $c, 'list_plugins' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'list_themes', array(
+		$tools[ 'list_themes' ] = array(
 			'title'       => 'List themes',
 			'description' => 'Installed themes with version, active state, parent theme and available update.',
 			'callback'    => array( $c, 'list_themes' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'security_audit', array(
+		$tools[ 'security_audit' ] = array(
 			'title'       => 'Security audit',
-			'description' => 'Runs about 30 security checks (updates, debug settings, exposed files, user enumeration, XML-RPC, security headers, SSL certificate expiry, file permissions, PHP files in uploads, admin accounts and more). Each check returns pass, warning or fail with a plain explanation and the fix tool to use.',
+			'description' => 'Runs about 30 security checks (updates, debug settings, exposed files, user enumeration, XML-RPC, security headers, SSL certificate expiry, file permissions, PHP files in uploads, admin accounts and more). Each check returns the result and practical next steps.',
 			'callback'    => array( $c, 'security_audit' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'scan_for_malware', array(
+		$tools[ 'scan_for_malware' ] = array(
 			'title'       => 'Scan for malware',
 			'description' => 'Looks for common signs of hacked code: PHP files in uploads, obfuscated code (eval with base64, gzinflate and similar), web shells, very long encoded strings and recently changed PHP files. Findings are leads to review, not proof.',
 			'properties'  => array(
-				'path'          => array( 'type' => 'string', 'description' => 'Folder relative to the WordPress root. Default wp-content.' ),
+				'path'          => array( 'type' => 'string', 'description' => 'Path relative to WordPress, or a configured root such as @content or @uploads. Default @content.' ),
 				'modified_days' => array( 'type' => 'integer', 'description' => 'Also list PHP files changed in the last N days. Default 14.' ),
 			),
 			'callback'    => array( $c, 'scan_for_malware' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'verify_core_files', array(
+		$tools[ 'verify_core_files' ] = array(
 			'title'       => 'Verify WordPress core files',
 			'description' => 'Compares every WordPress core file against the official checksums from WordPress.org to find modified, missing or unexpected files.',
 			'callback'    => array( $c, 'verify_core_files' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'verify_plugin_files', array(
+		$tools[ 'verify_plugin_files' ] = array(
 			'title'       => 'Verify plugin files',
 			'description' => 'Compares plugin files against official WordPress.org checksums to find modified or added files. Only works for plugins hosted on WordPress.org.',
 			'properties'  => array(
 				'plugin' => array( 'type' => 'string', 'description' => 'Plugin folder slug, for example contact-form-7. Leave out to check all active plugins.' ),
 			),
 			'callback'    => array( $c, 'verify_plugin_files' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'seo_audit', array(
+		$tools[ 'seo_audit' ] = array(
 			'title'       => 'Search optimisation audit',
 			'description' => 'Site level search checks (indexing, sitemap, robots.txt, permalinks, images without alt text) and a per page review of published content: search title and description, noindex, word count, headings, alt text and duplicates. Works with Yoast SEO and Rank Math.',
 			'properties'  => array(
@@ -73,18 +74,18 @@ class NomadSA_Audit_Tools {
 				'offset'     => array( 'type' => 'integer', 'description' => 'For paging. Default 0.' ),
 			),
 			'callback'    => array( $c, 'seo_audit' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'check_page', array(
+		$tools[ 'check_page' ] = array(
 			'title'       => 'Check a page',
 			'description' => 'Loads a page of this site like a visitor and reports response time, size, title, meta description, canonical, robots, headings, images, structured data, render blocking scripts, loading screens (preloaders), mixed content and response headers.',
 			'properties'  => array(
 				'url' => array( 'type' => 'string', 'description' => 'Full URL on this site or a path such as /about/. Default the homepage.' ),
 			),
 			'callback'    => array( $c, 'check_page' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'find_broken_links', array(
+		$tools[ 'find_broken_links' ] = array(
 			'title'       => 'Find broken links',
 			'description' => 'Collects links and images from published content and checks which ones fail. Internal links by default.',
 			'properties'  => array(
@@ -92,21 +93,21 @@ class NomadSA_Audit_Tools {
 				'max_urls'         => array( 'type' => 'integer', 'description' => 'Maximum unique URLs to check. Default 80, maximum 250.' ),
 			),
 			'callback'    => array( $c, 'find_broken_links' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'database_health', array(
+		$tools[ 'database_health' ] = array(
 			'title'       => 'Database health',
 			'description' => 'Database size, autoloaded options (a common cause of slow sites), revisions, drafts, trash, spam and expired temporary data.',
 			'callback'    => array( $c, 'database_health' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'list_cron_events', array(
+		$tools[ 'list_cron_events' ] = array(
 			'title'       => 'Scheduled tasks',
 			'description' => 'WordPress scheduled tasks with next run time and whether any are overdue.',
 			'callback'    => array( $c, 'list_cron_events' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'read_error_log', array(
+		$tools[ 'read_error_log' ] = array(
 			'title'       => 'Read error log',
 			'description' => 'Last lines of the WordPress debug log or PHP error log, with secrets removed.',
 			'properties'  => array(
@@ -114,20 +115,20 @@ class NomadSA_Audit_Tools {
 				'filter' => array( 'type' => 'string', 'description' => 'Only lines containing this text.' ),
 			),
 			'callback'    => array( $c, 'read_error_log' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'list_users', array(
+		$tools[ 'list_users' ] = array(
 			'title'       => 'List users',
 			'description' => 'Users with their roles, registration date and post count. Email addresses are partly hidden. Flags risky usernames.',
 			'properties'  => array(
 				'role' => array( 'type' => 'string', 'description' => 'Filter by role, for example administrator. Default all roles.' ),
 			),
 			'callback'    => array( $c, 'list_users' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'list_content', array(
+		$tools[ 'list_content' ] = array(
 			'title'       => 'List content',
-			'description' => 'Find posts, pages, media or other content and their IDs, for use with fix tools.',
+			'description' => 'Find posts, pages, media or other content and their IDs, for audit follow-up.',
 			'properties'  => array(
 				'post_type' => array( 'type' => 'string', 'description' => 'Default any. Use attachment for media.' ),
 				'search'    => array( 'type' => 'string' ),
@@ -135,19 +136,19 @@ class NomadSA_Audit_Tools {
 				'limit'     => array( 'type' => 'integer', 'description' => 'Default 50, maximum 200.' ),
 			),
 			'callback'    => array( $c, 'list_content' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'list_files', array(
+		$tools[ 'list_files' ] = array(
 			'title'       => 'List files',
 			'description' => 'Lists a folder inside the WordPress install with sizes, dates and permissions. Protected files such as wp-config.php are hidden.',
 			'properties'  => array(
-				'path'  => array( 'type' => 'string', 'description' => 'Relative to the WordPress root, for example wp-content/themes/astra-child. Default the root.' ),
+				'path'  => array( 'type' => 'string', 'description' => 'Relative to WordPress or a configured root such as @theme, @plugins, or @uploads. Default the WordPress root.' ),
 				'depth' => array( 'type' => 'integer', 'description' => 'Folder depth, 1 to 4. Default 1.' ),
 			),
 			'callback'    => array( $c, 'list_files' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'read_file', array(
+		$tools[ 'read_file' ] = array(
 			'title'       => 'Read file',
 			'description' => 'Reads a text file inside the WordPress install for code review. wp-config.php and other secret files are blocked and secrets are removed from the output.',
 			'properties'  => array(
@@ -157,49 +158,35 @@ class NomadSA_Audit_Tools {
 			),
 			'required'    => array( 'path' ),
 			'callback'    => array( $c, 'read_file' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'search_code', array(
+		$tools[ 'search_code' ] = array(
 			'title'       => 'Search code',
 			'description' => 'Searches files for text or a regular expression, for code review or to locate where something is set.',
 			'properties'  => array(
 				'pattern'     => array( 'type' => 'string', 'description' => 'Plain text, or a regular expression when regex is true.' ),
 				'regex'       => array( 'type' => 'boolean' ),
-				'path'        => array( 'type' => 'string', 'description' => 'Default wp-content.' ),
+				'path'        => array( 'type' => 'string', 'description' => 'Default @content.' ),
 				'extensions'  => array( 'type' => 'array', 'items' => array( 'type' => 'string' ), 'description' => 'Default php, js, css, html, twig, json, txt.' ),
 				'max_results' => array( 'type' => 'integer', 'description' => 'Default 100, maximum 500.' ),
 			),
 			'required'    => array( 'pattern' ),
 			'callback'    => array( $c, 'search_code' ),
-		) );
+		);
 
-		NomadSA_Tools::register( 'get_activity_log', array(
+		$tools[ 'get_activity_log' ] = array(
 			'title'       => 'Connector activity log',
-			'description' => 'What has been done through this connector: audits, previews and applied fixes.',
+			'description' => 'Recent audit activity and historical connector events.',
 			'properties'  => array(
 				'limit' => array( 'type' => 'integer', 'description' => 'Default 50, maximum 500.' ),
 				'kind'  => array( 'type' => 'string', 'enum' => array( 'audit', 'fix' ) ),
 			),
 			'callback'    => array( $c, 'get_activity_log' ),
-		) );
-
-		NomadSA_Tools::register( 'list_backups', array(
-			'title'       => 'List change backups',
-			'description' => 'Backups the connector saved before changing files, search titles, alt text, content or settings. Use restore_backup to undo a change.',
-			'properties'  => array( 'limit' => array( 'type' => 'integer', 'description' => 'Default 50.' ) ),
-			'callback'    => array( $c, 'list_backups' ),
-		) );
+		);
+		return $tools;
 	}
 
 	/* ================================================================ Helpers */
-
-	private static function admin_includes() {
-		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		require_once ABSPATH . 'wp-admin/includes/update.php';
-		require_once ABSPATH . 'wp-admin/includes/theme.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/misc.php';
-	}
 
 	private static function detect_stack() {
 		$active = (array) get_option( 'active_plugins', array() );
@@ -258,12 +245,32 @@ class NomadSA_Audit_Tools {
 		return array( 'title' => '', 'description' => '', 'noindex' => false );
 	}
 
-	private static function check( $id, $status, $title, $detail, $fix = '' ) {
-		$c = array( 'id' => $id, 'status' => $status, 'title' => $title, 'detail' => $detail );
-		if ( $fix ) {
-			$c['fix'] = $fix;
+	private static function check( $id, $status, $title, $detail ) {
+		return array( 'id' => $id, 'status' => $status, 'title' => $title, 'detail' => $detail );
+	}
+
+	private static function debug_log_path() {
+		if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) && '' !== WP_DEBUG_LOG
+			&& ! in_array( strtolower( WP_DEBUG_LOG ), array( 'true', '1' ), true ) ) {
+			return WP_DEBUG_LOG;
 		}
-		return $c;
+		return trailingslashit( WP_CONTENT_DIR ) . 'debug.log';
+	}
+
+	private static function public_log_url( $path ) {
+		$path = realpath( $path );
+		if ( false === $path ) {
+			return '';
+		}
+		$uploads = wp_get_upload_dir();
+		foreach ( array( array( $uploads['basedir'], $uploads['baseurl'] ), array( WP_CONTENT_DIR, content_url() ), array( ABSPATH, site_url() ) ) as list( $root, $url ) ) {
+			$root = realpath( $root );
+			if ( false !== $root && NomadSA_Tools::within( $path, $root ) ) {
+				$relative = ltrim( substr( wp_normalize_path( $path ), strlen( wp_normalize_path( $root ) ) ), '/' );
+				return trailingslashit( $url ) . implode( '/', array_map( 'rawurlencode', explode( '/', $relative ) ) );
+			}
+		}
+		return '';
 	}
 
 	private static function header_value( $res, $name ) {
@@ -294,10 +301,8 @@ class NomadSA_Audit_Tools {
 
 	public static function site_overview() {
 		global $wpdb, $wp_version;
-		self::admin_includes();
-		wp_version_check();
-		wp_update_plugins();
-		wp_update_themes();
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/update.php';
 
 		$plugins     = get_plugins();
 		$active      = (array) get_option( 'active_plugins', array() );
@@ -362,14 +367,13 @@ class NomadSA_Audit_Tools {
 			'detected'  => self::detect_stack(),
 			'connector' => array(
 				'version'       => NOMADSA_VERSION,
-				'fixes_allowed' => NomadSA_OAuth::can_fix(),
+				'read_only'     => true,
 			),
 		);
 	}
 
 	public static function list_plugins( $args ) {
-		self::admin_includes();
-		wp_update_plugins();
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		$check   = ! isset( $args['check_directory'] ) || $args['check_directory'];
 		$plugins = get_plugins();
 		$active  = (array) get_option( 'active_plugins', array() );
@@ -464,8 +468,6 @@ class NomadSA_Audit_Tools {
 	}
 
 	public static function list_themes() {
-		self::admin_includes();
-		wp_update_themes();
 		$updates = get_site_transient( 'update_themes' );
 		$active  = get_stylesheet();
 		$out     = array();
@@ -484,43 +486,47 @@ class NomadSA_Audit_Tools {
 
 	/* ================================================================ Security */
 
-	public static function security_audit() {
+	public static function security_audit( $args = array(), $timeout = 15 ) {
 		global $wpdb, $wp_version;
-		self::admin_includes();
-		wp_version_check();
-		wp_update_plugins();
-		wp_update_themes();
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/update.php';
 		$checks = array();
 		$home   = home_url( '/' );
 
 		// Updates.
 		$core = get_core_updates();
 		if ( ! empty( $core[0] ) && 'upgrade' === $core[0]->response ) {
-			$checks[] = self::check( 'core_updates', 'fail', 'WordPress is out of date', 'Running ' . $wp_version . ', latest is ' . $core[0]->current . '.', 'update_core' );
-		} else {
+			$checks[] = self::check( 'core_updates', 'fail', 'WordPress is out of date', 'Running ' . $wp_version . ', latest is ' . $core[0]->current . '.' );
+		} elseif ( ! empty( $core ) ) {
 			$checks[] = self::check( 'core_updates', 'pass', 'WordPress is up to date', 'Running ' . $wp_version . '.' );
+		} else {
+			$checks[] = self::check( 'core_updates', 'info', 'WordPress update status unavailable', 'Open Dashboard → Updates to refresh WordPress update information.' );
 		}
 		$pu = get_site_transient( 'update_plugins' );
 		$n  = isset( $pu->response ) ? count( $pu->response ) : 0;
 		$checks[] = $n
-			? self::check( 'plugin_updates', 'warning', $n . ' plugin updates available', implode( ', ', array_map( function ( $f ) { return dirname( $f ); }, array_keys( $pu->response ) ) ), 'update_plugins' )
-			: self::check( 'plugin_updates', 'pass', 'All plugins are up to date', '' );
+			? self::check( 'plugin_updates', 'warning', $n . ' plugin updates available', implode( ', ', array_map( function ( $f ) { return dirname( $f ); }, array_keys( $pu->response ) ) ) )
+			: ( $pu
+				? self::check( 'plugin_updates', 'pass', 'All plugins are up to date', '' )
+				: self::check( 'plugin_updates', 'info', 'Plugin update status unavailable', 'Open Dashboard → Updates to refresh plugin update information.' ) );
 		$tu = get_site_transient( 'update_themes' );
 		$n  = isset( $tu->response ) ? count( $tu->response ) : 0;
 		$checks[] = $n
-			? self::check( 'theme_updates', 'warning', $n . ' theme updates available', implode( ', ', array_keys( $tu->response ) ), 'update_themes' )
-			: self::check( 'theme_updates', 'pass', 'All themes are up to date', '' );
+			? self::check( 'theme_updates', 'warning', $n . ' theme updates available', implode( ', ', array_keys( $tu->response ) ) )
+			: ( $tu
+				? self::check( 'theme_updates', 'pass', 'All themes are up to date', '' )
+				: self::check( 'theme_updates', 'info', 'Theme update status unavailable', 'Open Dashboard → Updates to refresh theme update information.' ) );
 
 		$plugins  = get_plugins();
 		$inactive = array_diff( array_keys( $plugins ), (array) get_option( 'active_plugins', array() ) );
 		$checks[] = $inactive
-			? self::check( 'inactive_plugins', 'warning', count( $inactive ) . ' inactive plugins installed', 'Inactive plugins can still be attacked. Delete those not needed: ' . implode( ', ', $inactive ), 'delete_plugin' )
+			? self::check( 'inactive_plugins', 'warning', count( $inactive ) . ' inactive plugins installed', 'Inactive plugins can still be attacked. Delete those not needed: ' . implode( ', ', $inactive ) )
 			: self::check( 'inactive_plugins', 'pass', 'No inactive plugins', '' );
 
 		$themes   = wp_get_themes();
 		$extra    = array_diff( array_keys( $themes ), array( get_stylesheet(), get_template() ) );
 		$checks[] = count( $extra ) > 1
-			? self::check( 'inactive_themes', 'warning', count( $extra ) . ' unused themes', 'Keep one default theme as a fallback and remove the rest: ' . implode( ', ', $extra ), 'delete_theme' )
+			? self::check( 'inactive_themes', 'warning', count( $extra ) . ' unused themes', 'Keep one default theme as a fallback and remove the rest: ' . implode( ', ', $extra ) )
 			: self::check( 'inactive_themes', 'pass', 'No unnecessary themes', '' );
 
 		// Server.
@@ -532,7 +538,7 @@ class NomadSA_Audit_Tools {
 		$checks[] = $https ? self::check( 'https', 'pass', 'Site uses HTTPS', '' ) : self::check( 'https', 'fail', 'Site is not fully on HTTPS', 'Home and site address should both start with https://.' );
 
 		if ( $https ) {
-			$checks[] = self::ssl_check( wp_parse_url( home_url(), PHP_URL_HOST ) );
+			$checks[] = self::ssl_check( wp_parse_url( home_url(), PHP_URL_HOST ), min( $timeout, 8 ) );
 		}
 
 		// Debug.
@@ -546,23 +552,24 @@ class NomadSA_Audit_Tools {
 			$checks[] = self::check( 'debug_display', 'pass', 'Debug mode is off', '' );
 		}
 
-		$log = WP_CONTENT_DIR . '/debug.log';
-		if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) ) {
-			$log = WP_DEBUG_LOG;
-		}
-		if ( file_exists( $log ) && 0 === strpos( wp_normalize_path( $log ), wp_normalize_path( ABSPATH ) ) ) {
-			$url = home_url( '/' . NomadSA_Tools::relative( $log ) );
-			list( $res ) = NomadSA_Tools::fetch( $url, 'HEAD' );
-			$public  = ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res );
-			$checks[] = $public
-				? self::check( 'debug_log_public', 'fail', 'Error log can be downloaded by anyone', $url . ' is public and can leak paths and data. Block it or move the log outside the web folder.' )
-				: self::check( 'debug_log_public', 'pass', 'Error log is not public', '' );
+		$url = self::public_log_url( self::debug_log_path() );
+		if ( '' !== $url ) {
+			list( $res ) = NomadSA_Tools::fetch( $url, 'HEAD', $timeout );
+			if ( is_wp_error( $res ) ) {
+				$checks[] = self::check( 'debug_log_public', 'unknown', 'Could not test access to the error log', 'Check the log URL from outside the server or ask your host to verify access.' );
+			} else {
+				$checks[] = 200 === wp_remote_retrieve_response_code( $res )
+					? self::check( 'debug_log_public', 'fail', 'Error log can be downloaded by anyone', $url . ' is public and can leak paths and data. Block it or move the log outside the web folder.' )
+					: self::check( 'debug_log_public', 'pass', 'Error log URL did not return the log', '' );
+			}
+		} else {
+			$checks[] = self::check( 'debug_log_public', 'pass', 'No WordPress debug log mapped to a public directory', '' );
 		}
 
 		// Files.
 		$checks[] = ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT )
 			? self::check( 'file_editor', 'pass', 'Built in code editor is disabled', '' )
-			: self::check( 'file_editor', 'warning', 'Built in code editor is enabled', 'Anyone who gets into an admin account can edit plugin and theme code from the dashboard.', 'apply_hardening' );
+			: self::check( 'file_editor', 'warning', 'Built in code editor is enabled', 'Anyone who gets into an admin account can edit plugin and theme code from the dashboard.' );
 
 		$cfg = file_exists( ABSPATH . 'wp-config.php' ) ? ABSPATH . 'wp-config.php' : dirname( ABSPATH ) . '/wp-config.php';
 		if ( file_exists( $cfg ) ) {
@@ -572,36 +579,33 @@ class NomadSA_Audit_Tools {
 				: self::check( 'wp_config_perms', ( $perms & 0004 ) ? 'info' : 'pass', 'wp-config.php permissions are ' . decoct( $perms ), ( $perms & 0004 ) ? 'Readable by other server users. 640 or 600 is stricter if the host allows.' : '' );
 		}
 
-		$default_salt = ! defined( 'AUTH_KEY' ) || 'put your unique phrase here' === AUTH_KEY || strlen( (string) AUTH_KEY ) < 32;
-		$checks[]     = $default_salt
-			? self::check( 'salts', 'fail', 'Security keys are missing or weak', 'Generate new keys at api.wordpress.org/secret-key/1.1/salt and place them in wp-config.php.' )
-			: self::check( 'salts', 'pass', 'Security keys are set', '' );
-
 		$uploads = wp_get_upload_dir();
 		$php_in_uploads = self::find_files( $uploads['basedir'], '/\.(php\d?|phtml|phar)$/i', 200 );
 		$guards         = array_filter( $php_in_uploads, array( 'NomadSA_Tools', 'is_guard_file' ) );
 		$suspicious     = array_diff( $php_in_uploads, $guards );
 		if ( $suspicious ) {
-			$checks[] = self::check( 'php_in_uploads', 'fail', count( $suspicious ) . ' PHP files with code in the uploads folder', 'Uploads should only contain media. Review these, they may be malicious: ' . implode( ', ', array_map( array( 'NomadSA_Tools', 'relative' ), array_slice( $suspicious, 0, 20 ) ) ), 'read_file' );
+			$checks[] = self::check( 'php_in_uploads', 'fail', count( $suspicious ) . ' PHP files with code in the uploads folder', 'Uploads should only contain media. Review these, they may be malicious: ' . implode( ', ', array_map( array( 'NomadSA_Tools', 'relative' ), array_slice( $suspicious, 0, 20 ) ) ) );
 		} elseif ( $guards ) {
 			$folders  = array_unique( array_map( function ( $f ) { return NomadSA_Tools::relative( dirname( $f ) ); }, $guards ) );
-			$checks[] = self::check( 'php_in_uploads', 'info', count( $guards ) . ' harmless PHP placeholder or data files in uploads', 'Blank index files or plugin data files that stop immediately, in: ' . implode( ', ', array_slice( $folders, 0, 10 ) ) . '. Leftovers from removed plugins can be cleaned up.', 'delete_uploads_path' );
+			$checks[] = self::check( 'php_in_uploads', 'info', count( $guards ) . ' harmless PHP placeholder or data files in uploads', 'Blank index files or plugin data files that stop immediately, in: ' . implode( ', ', array_slice( $folders, 0, 10 ) ) . '. Leftovers from removed plugins can be cleaned up.' );
 		} else {
 			$checks[] = self::check( 'php_in_uploads', 'pass', 'No PHP files in uploads', '' );
 		}
 
-		list( $res ) = NomadSA_Tools::fetch( $uploads['baseurl'] . '/' );
+		list( $res ) = NomadSA_Tools::fetch( $uploads['baseurl'] . '/', 'GET', $timeout );
 		$listing  = ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res ) && false !== stripos( wp_remote_retrieve_body( $res ), 'Index of' );
-		$checks[] = $listing
+		$checks[] = is_wp_error( $res )
+			? self::check( 'directory_listing', 'unknown', 'Could not test folder browsing', '' )
+			: ( $listing
 			? self::check( 'directory_listing', 'fail', 'Folder contents can be browsed', $uploads['baseurl'] . '/ lists every file. Ask the host to disable directory listing.' )
-			: self::check( 'directory_listing', 'pass', 'Folder browsing is blocked', '' );
+			: self::check( 'directory_listing', 'pass', 'Folder browsing is blocked', '' ) );
 
-		$info_files = array_filter( array( 'readme.html', 'license.txt', 'wp-admin/install.php' ), function ( $f ) {
-			return 'wp-admin/install.php' !== $f && file_exists( ABSPATH . $f );
+		$info_files = array_filter( array( 'readme.html', 'license.txt' ), function ( $f ) {
+			return file_exists( ABSPATH . $f );
 		} );
 		$checks[] = $info_files
-			? self::check( 'info_files', 'info', 'WordPress information files are public', implode( ', ', $info_files ) . ' reveal that the site runs WordPress and sometimes the version. Low risk.', 'apply_hardening' )
-			: self::check( 'info_files', 'pass', 'WordPress information files removed', '' );
+			? self::check( 'info_files', 'info', 'WordPress information files are present', implode( ', ', $info_files ) . ' reveal that the site runs WordPress and sometimes the version. Low risk.' )
+			: self::check( 'info_files', 'pass', 'WordPress information files are absent', '' );
 
 		// Users.
 		$risky = get_users( array( 'login__in' => array( 'admin', 'administrator', 'root', 'test', 'demo', 'user' ), 'fields' => array( 'user_login' ) ) );
@@ -617,35 +621,43 @@ class NomadSA_Audit_Tools {
 		if ( get_option( 'users_can_register' ) ) {
 			$role     = get_option( 'default_role' );
 			$checks[] = in_array( $role, array( 'administrator', 'editor', 'shop_manager' ), true )
-				? self::check( 'registration', 'fail', 'Anyone can register as ' . $role, 'This gives strangers powerful access. Switch registration off or set the default role to subscriber.', 'set_site_setting' )
-				: self::check( 'registration', 'info', 'Anyone can register (as ' . $role . ')', 'Fine if intended, otherwise switch it off.', 'set_site_setting' );
+				? self::check( 'registration', 'fail', 'Anyone can register as ' . $role, 'This gives strangers powerful access. Switch registration off or set the default role to subscriber.' )
+				: self::check( 'registration', 'info', 'Anyone can register (as ' . $role . ')', 'Fine if intended, otherwise switch it off.' );
 		} else {
 			$checks[] = self::check( 'registration', 'pass', 'Public registration is off', '' );
 		}
 
 		$enum = false;
-		list( $res ) = NomadSA_Tools::fetch( rest_url( 'wp/v2/users' ) );
+		list( $res ) = NomadSA_Tools::fetch( rest_url( 'wp/v2/users' ), 'GET', $timeout );
 		if ( ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res ) ) {
 			$list = json_decode( wp_remote_retrieve_body( $res ), true );
 			$enum = is_array( $list ) && ! empty( $list );
 		}
-		$checks[] = $enum
-			? self::check( 'user_enumeration', 'warning', 'Usernames can be listed by anyone', rest_url( 'wp/v2/users' ) . ' shows author accounts, which helps password guessing attacks.', 'apply_hardening' )
-			: self::check( 'user_enumeration', 'pass', 'Usernames are not publicly listed', '' );
+		$checks[] = is_wp_error( $res )
+			? self::check( 'user_enumeration', 'unknown', 'Could not test public author access', '' )
+			: ( $enum
+			? self::check( 'user_enumeration', 'warning', 'Usernames can be listed by anyone', rest_url( 'wp/v2/users' ) . ' shows author accounts, which helps password guessing attacks.' )
+			: self::check( 'user_enumeration', 'pass', 'Usernames are not publicly listed', '' ) );
 
+		$xmlrpc_checked = true;
 		$xmlrpc_on = apply_filters( 'xmlrpc_enabled', true ) // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core filter.
 			 && ! NomadSA_Settings::runtime( 'disable_xmlrpc' );
 		if ( $xmlrpc_on ) {
-			list( $res ) = NomadSA_Tools::fetch( site_url( '/xmlrpc.php' ) );
-			$xmlrpc_on = ! is_wp_error( $res ) && in_array( wp_remote_retrieve_response_code( $res ), array( 200, 405 ), true ) && false !== stripos( wp_remote_retrieve_body( $res ), 'XML-RPC' );
+			list( $res ) = NomadSA_Tools::fetch( site_url( '/xmlrpc.php' ), 'GET', $timeout );
+			$xmlrpc_checked = ! is_wp_error( $res );
+			$xmlrpc_on = $xmlrpc_checked && in_array( wp_remote_retrieve_response_code( $res ), array( 200, 405 ), true ) && false !== stripos( wp_remote_retrieve_body( $res ), 'XML-RPC' );
 		}
-		$checks[] = $xmlrpc_on
-			? self::check( 'xmlrpc', 'warning', 'XML-RPC is enabled', 'An old remote access method often used for password guessing attacks. Safe to disable unless the Jetpack plugin or the WordPress mobile app is used.', 'apply_hardening' )
-			: self::check( 'xmlrpc', 'pass', 'XML-RPC is disabled or blocked', '' );
+		$checks[] = ! $xmlrpc_checked
+			? self::check( 'xmlrpc', 'unknown', 'Could not test XML-RPC', '' )
+			: ( $xmlrpc_on
+			? self::check( 'xmlrpc', 'warning', 'XML-RPC is enabled', 'An old remote access method often used for password guessing attacks. Safe to disable unless the Jetpack plugin or the WordPress mobile app is used.' )
+			: self::check( 'xmlrpc', 'pass', 'XML-RPC is disabled or blocked', '' ) );
 
 		// Homepage headers.
-		list( $res, $ms ) = NomadSA_Tools::fetch( $home );
-		if ( ! is_wp_error( $res ) ) {
+		list( $res ) = NomadSA_Tools::fetch( $home, 'GET', $timeout );
+		$home_status = is_wp_error( $res ) ? 0 : wp_remote_retrieve_response_code( $res );
+		if ( $home_status >= 200 && $home_status < 400 ) {
+			$checks[] = self::check( 'homepage', 'pass', 'The homepage responded', 'HTTP ' . $home_status );
 			$want    = array( 'strict-transport-security', 'x-content-type-options', 'x-frame-options', 'referrer-policy', 'permissions-policy', 'content-security-policy' );
 			$missing = array();
 			foreach ( $want as $h ) {
@@ -658,7 +670,7 @@ class NomadSA_Audit_Tools {
 			}
 			$missing_core = array_diff( $missing, array( 'content-security-policy' ) );
 			$checks[]     = $missing_core
-				? self::check( 'security_headers', 'warning', count( $missing ) . ' browser security headers missing', 'Missing: ' . implode( ', ', $missing ) . '. These tell browsers to block common attacks such as clickjacking.', 'set_security_headers' )
+				? self::check( 'security_headers', 'warning', count( $missing ) . ' browser security headers missing', 'Missing: ' . implode( ', ', $missing ) . '. These tell browsers to block common attacks such as clickjacking.' )
 				: self::check( 'security_headers', 'pass', 'Browser security headers are set', $missing ? 'Content-Security-Policy is not set, which is common and optional.' : '' );
 
 			$leaks = array();
@@ -673,10 +685,10 @@ class NomadSA_Audit_Tools {
 				$leaks[] = 'generator meta tag shows WordPress ' . $m[1];
 			}
 			$checks[] = $leaks
-				? self::check( 'version_disclosure', 'info', 'Software versions are visible', implode( '; ', $leaks ), 'apply_hardening' )
+				? self::check( 'version_disclosure', 'info', 'Software versions are visible', implode( '; ', $leaks ) )
 				: self::check( 'version_disclosure', 'pass', 'Software versions are hidden', '' );
 		} else {
-			$checks[] = self::check( 'homepage', 'fail', 'Could not load the homepage', $res->get_error_message() );
+			$checks[] = self::check( 'homepage', 'fail', 'Could not load the homepage', $home_status ? 'HTTP ' . $home_status : $res->get_error_message() );
 		}
 
 		// Protection plugins.
@@ -691,7 +703,7 @@ class NomadSA_Audit_Tools {
 		$auto     = (array) get_site_option( 'auto_update_plugins', array() );
 		$checks[] = self::check( 'auto_updates', 'info', count( $auto ) . ' plugins update automatically', 'Automatic updates close security holes faster; manual updates give more control. Either is fine with regular maintenance.' );
 
-		$score = array( 'pass' => 0, 'warning' => 0, 'fail' => 0, 'info' => 0 );
+		$score = array( 'pass' => 0, 'warning' => 0, 'fail' => 0, 'info' => 0, 'unknown' => 0 );
 		foreach ( $checks as $c ) {
 			$score[ $c['status'] ]++;
 		}
@@ -702,20 +714,21 @@ class NomadSA_Audit_Tools {
 		);
 	}
 
-	private static function ssl_check( $host ) {
+	private static function ssl_check( $host, $timeout ) {
 		if ( ! function_exists( 'stream_socket_client' ) || ! function_exists( 'openssl_x509_parse' ) ) {
-			return self::check( 'ssl_expiry', 'info', 'SSL certificate not checked', 'The server cannot inspect certificates.' );
+			return self::check( 'ssl_expiry', 'unknown', 'SSL certificate not checked', 'The server cannot inspect certificates.' );
 		}
 		$ctx = stream_context_create( array( 'ssl' => array( 'capture_peer_cert' => true, 'verify_peer' => false, 'verify_peer_name' => false, 'SNI_enabled' => true, 'peer_name' => $host ) ) );
-		$fp  = @stream_socket_client( 'ssl://' . $host . ':443', $errno, $errstr, 8, STREAM_CLIENT_CONNECT, $ctx );
+		$fp  = @stream_socket_client( 'ssl://' . $host . ':443', $errno, $errstr, $timeout, STREAM_CLIENT_CONNECT, $ctx );
 		if ( ! $fp ) {
-			return self::check( 'ssl_expiry', 'info', 'SSL certificate not checked', 'Could not connect: ' . $errstr );
+			return self::check( 'ssl_expiry', 'unknown', 'SSL certificate not checked', 'Could not connect: ' . $errstr );
 		}
 		$params = stream_context_get_params( $fp );
 		fclose( $fp ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closes a network socket, not a file.
-		$cert = openssl_x509_parse( $params['options']['ssl']['peer_certificate'] ?? '' );
+		$peer = $params['options']['ssl']['peer_certificate'] ?? null;
+		$cert = $peer ? openssl_x509_parse( $peer ) : false;
 		if ( ! $cert ) {
-			return self::check( 'ssl_expiry', 'info', 'SSL certificate not checked', '' );
+			return self::check( 'ssl_expiry', 'unknown', 'SSL certificate not checked', '' );
 		}
 		$days   = (int) floor( ( $cert['validTo_time_t'] - time() ) / DAY_IN_SECONDS );
 		$issuer = $cert['issuer']['O'] ?? ( $cert['issuer']['CN'] ?? '' );
@@ -737,7 +750,7 @@ class NomadSA_Audit_Tools {
 				if ( ++$scanned > $max_scan ) {
 					break;
 				}
-				if ( preg_match( $regex, $file->getFilename() ) ) {
+				if ( ! $file->isLink() && $file->isFile() && ! NomadSA_Tools::is_sensitive_path( wp_normalize_path( $file->getPathname() ) ) && preg_match( $regex, $file->getFilename() ) ) {
 					$found[] = $file->getPathname();
 					if ( count( $found ) >= $limit ) {
 						break;
@@ -751,10 +764,13 @@ class NomadSA_Audit_Tools {
 	}
 
 	public static function scan_for_malware( $args ) {
-		$rel  = isset( $args['path'] ) ? (string) $args['path'] : 'wp-content';
+		$rel  = isset( $args['path'] ) ? (string) $args['path'] : '@content';
 		$root = NomadSA_Tools::resolve_path( $rel );
 		if ( is_wp_error( $root ) ) {
 			return $root;
+		}
+		if ( ! is_dir( $root ) ) {
+			return new WP_Error( 'nomadsa_path', 'Not a folder.' );
 		}
 		$days     = NomadSA_Tools::int_arg( $args, 'modified_days', 14, 0, 365 );
 		$patterns = array(
@@ -770,7 +786,7 @@ class NomadSA_Audit_Tools {
 		);
 		$findings = array();
 		$recent   = array();
-		$uploads  = wp_normalize_path( wp_get_upload_dir()['basedir'] );
+		$uploads  = realpath( wp_get_upload_dir()['basedir'] );
 		$self_dir = wp_normalize_path( NOMADSA_DIR );
 		$scanned  = 0;
 		$cutoff   = time() - $days * DAY_IN_SECONDS;
@@ -778,7 +794,7 @@ class NomadSA_Audit_Tools {
 		$it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $it as $file ) {
 			$path = wp_normalize_path( $file->getPathname() );
-			if ( ! preg_match( '/\.(php\d?|phtml|phar|inc|ico|js)$/i', $path ) || 0 === strpos( $path, $self_dir ) || NomadSA_Tools::is_sensitive_path( $path ) ) {
+			if ( $file->isLink() || ! $file->isFile() || ! preg_match( '/\.(php\d?|phtml|phar|inc|ico|js)$/i', $path ) || 0 === strpos( $path, $self_dir ) || NomadSA_Tools::is_sensitive_path( $path ) ) {
 				continue;
 			}
 			if ( ++$scanned > 40000 ) {
@@ -788,7 +804,7 @@ class NomadSA_Audit_Tools {
 			if ( $is_php && $days && $file->getMTime() > $cutoff && count( $recent ) < 100 ) {
 				$recent[] = array( 'file' => NomadSA_Tools::relative( $path ), 'modified' => gmdate( 'Y-m-d H:i', $file->getMTime() ) );
 			}
-			if ( $is_php && 0 === strpos( $path, $uploads ) && ! NomadSA_Tools::is_guard_file( $path ) ) {
+			if ( $is_php && false !== $uploads && NomadSA_Tools::within( $path, $uploads ) && ! NomadSA_Tools::is_guard_file( $path ) ) {
 				$findings[] = array( 'file' => NomadSA_Tools::relative( $path ), 'rule' => 'php_in_uploads', 'line' => null, 'snippet' => '' );
 			}
 			if ( $file->getSize() > 3 * MB_IN_BYTES ) {
@@ -834,7 +850,7 @@ class NomadSA_Audit_Tools {
 
 	public static function verify_core_files() {
 		global $wp_version;
-		self::admin_includes();
+		require_once ABSPATH . 'wp-admin/includes/update.php';
 		$locale = get_locale();
 		$sums   = get_core_checksums( $wp_version, $locale );
 		if ( ! $sums && 'en_US' !== $locale ) {
@@ -894,7 +910,7 @@ class NomadSA_Audit_Tools {
 	}
 
 	public static function verify_plugin_files( $args ) {
-		self::admin_includes();
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		$plugins = get_plugins();
 		$active  = (array) get_option( 'active_plugins', array() );
 		$only    = isset( $args['plugin'] ) ? sanitize_key( $args['plugin'] ) : '';
@@ -953,7 +969,7 @@ class NomadSA_Audit_Tools {
 
 	/* ================================================================ Search */
 
-	public static function seo_audit( $args ) {
+	public static function seo_audit( $args, $timeout = 15 ) {
 		$types  = ! empty( $args['post_types'] ) && is_array( $args['post_types'] ) ? array_map( 'sanitize_key', $args['post_types'] ) : array( 'page', 'post' );
 		$limit  = NomadSA_Tools::int_arg( $args, 'limit', 100, 1, 300 );
 		$offset = NomadSA_Tools::int_arg( $args, 'offset', 0, 0, 100000 );
@@ -966,16 +982,17 @@ class NomadSA_Audit_Tools {
 		$site['site_title']             = get_bloginfo( 'name' );
 		$site['tagline']                = get_bloginfo( 'description' );
 
-		$sitemap = 'yoast' === $plugin || 'rankmath' === $plugin ? home_url( '/sitemap_index.xml' ) : home_url( '/wp-sitemap.xml' );
-		list( $res ) = NomadSA_Tools::fetch( $sitemap );
+		$sitemap = 'yoast' === $plugin || 'rankmath' === $plugin ? home_url( '/sitemap_index.xml' ) : get_sitemap_url( 'index' );
+		list( $res ) = NomadSA_Tools::fetch( $sitemap, 'GET', $timeout );
 		$site['sitemap'] = array(
 			'url'    => $sitemap,
 			'status' => is_wp_error( $res ) ? $res->get_error_message() : wp_remote_retrieve_response_code( $res ),
 		);
-		list( $res ) = NomadSA_Tools::fetch( home_url( '/robots.txt' ) );
+		list( $res ) = NomadSA_Tools::fetch( home_url( '/robots.txt' ), 'GET', $timeout );
 		$robots      = is_wp_error( $res ) ? '' : wp_remote_retrieve_body( $res );
 		$site['robots_txt'] = array(
 			'content'          => mb_substr( $robots, 0, 2000 ),
+			'available'         => ! is_wp_error( $res ) && in_array( wp_remote_retrieve_response_code( $res ), array( 200, 404, 410 ), true ),
 			'blocks_whole_site' => (bool) preg_match( '/^\s*Disallow:\s*\/\s*$/mi', $robots ),
 			'lists_sitemap'    => false !== stripos( $robots, 'sitemap:' ),
 		);
@@ -1103,7 +1120,7 @@ class NomadSA_Audit_Tools {
 			'issue_counts' => $counts,
 			'items'        => $items,
 			'paging'       => array( 'offset' => $offset, 'limit' => $limit, 'returned' => count( $items ) ),
-			'tip'          => 'Use check_page on important pages for a rendered view, and update_seo_meta to fix titles and descriptions.',
+			'tip'          => 'Use check_page for a rendered view. Edit search titles and descriptions in the WordPress editor or your SEO plugin.',
 		);
 	}
 
@@ -1112,7 +1129,12 @@ class NomadSA_Audit_Tools {
 		if ( 0 === strpos( $url, '/' ) ) {
 			$url = home_url( $url );
 		}
-		if ( wp_parse_url( $url, PHP_URL_HOST ) !== wp_parse_url( home_url(), PHP_URL_HOST ) ) {
+		$target = wp_parse_url( $url );
+		$home = wp_parse_url( home_url() );
+		if ( empty( $target['host'] ) || strtolower( $target['host'] ) !== strtolower( $home['host'] )
+			|| ( $target['scheme'] ?? '' ) !== $home['scheme']
+			|| ( $target['port'] ?? ( 'https' === $home['scheme'] ? 443 : 80 ) ) !== ( $home['port'] ?? ( 'https' === $home['scheme'] ? 443 : 80 ) )
+			|| isset( $target['user'] ) || isset( $target['pass'] ) ) {
 			return new WP_Error( 'nomadsa_url', 'Only pages on this site can be checked.' );
 		}
 		list( $res, $ms ) = NomadSA_Tools::fetch( $url );
@@ -1138,10 +1160,15 @@ class NomadSA_Audit_Tools {
 			return $out;
 		}
 
-		libxml_use_internal_errors( true );
+		if ( ! class_exists( 'DOMDocument' ) || ! class_exists( 'DOMXPath' ) ) {
+			$out['note'] = 'Install the PHP DOM extension to analyse the page HTML.';
+			return $out;
+		}
+		$previous = libxml_use_internal_errors( true );
 		$doc = new DOMDocument();
-		$doc->loadHTML( '<?xml encoding="utf-8" ?>' . $html );
+		$doc->loadHTML( '<?xml encoding="utf-8" ?>' . $html, LIBXML_NONET );
 		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
 		$xp = new DOMXPath( $doc );
 
 		$first = function ( $q, $attr = null ) use ( $xp ) {
@@ -1324,7 +1351,7 @@ class NomadSA_Audit_Tools {
 			'summary'       => count( $broken ) . ' broken out of ' . $checked . ' checked (' . count( $urls ) . ' unique links found)',
 			'broken'        => $broken,
 			'not_checked'   => max( 0, count( $urls ) - $checked ),
-			'tip'           => 'Use replace_in_content to correct a link on the pages listed.',
+			'tip'           => 'Correct broken links in the WordPress editor on the pages listed.',
 		);
 	}
 
@@ -1360,7 +1387,7 @@ class NomadSA_Audit_Tools {
 		}
 		$out['notes']   = $notes;
 		$out['summary'] = 'Autoload ' . $out['autoload_kb'] . ' KB, ' . $out['revisions'] . ' revisions, ' . $out['expired_transients'] . ' expired transients';
-		$out['tip']     = 'Use clean_database to remove revisions, drafts, trash, spam and expired transients.';
+		$out['tip']     = 'Review these counts before running database maintenance from WordPress or your host.';
 		return $out;
 	}
 
@@ -1394,26 +1421,16 @@ class NomadSA_Audit_Tools {
 	public static function read_error_log( $args ) {
 		$lines  = NomadSA_Tools::int_arg( $args, 'lines', 100, 1, 1000 );
 		$filter = isset( $args['filter'] ) ? (string) $args['filter'] : '';
-		$files  = array();
-		if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) ) {
-			$files[] = WP_DEBUG_LOG;
-		}
-		$files[] = WP_CONTENT_DIR . '/debug.log';
-		$ini     = ini_get( 'error_log' );
-		if ( $ini ) {
-			$files[] = $ini;
-		}
-		$files[] = ABSPATH . 'error_log';
-		$files[] = ABSPATH . 'wp-admin/error_log';
+		$files  = array_filter( array( self::debug_log_path(), ini_get( 'error_log' ) ) );
 		foreach ( array_unique( $files ) as $f ) {
-			if ( ! @is_readable( $f ) || ! is_file( $f ) ) {
+			if ( ! stream_is_local( $f ) || ! is_file( $f ) || ! is_readable( $f ) ) {
 				continue;
 			}
 			$size = filesize( $f );
 			$read = min( $size, 2 * MB_IN_BYTES );
 			// Only the end of the log matters, and logs can be very large.
-			$chunk = (string) file_get_contents( $f, false, null, max( 0, $size - $read ), $read );
-			$all = preg_split( '/\r?\n/', (string) $chunk );
+			$chunk = $read ? (string) file_get_contents( $f, false, null, $size - $read, $read ) : '';
+			$all = preg_split( '/\r?\n/', NomadSA_Tools::redact( $chunk ) );
 			if ( $filter ) {
 				$all = array_filter( $all, function ( $l ) use ( $filter ) {
 					return false !== stripos( $l, $filter );
@@ -1424,7 +1441,7 @@ class NomadSA_Audit_Tools {
 				'summary' => basename( $f ) . ', ' . size_format( $size ) . ', showing ' . count( $tail ) . ' lines',
 				'file'    => basename( $f ),
 				'size'    => size_format( $size ),
-				'lines'   => array_map( array( 'NomadSA_Tools', 'redact' ), $tail ),
+				'lines'   => $tail,
 			);
 		}
 		return array( 'summary' => 'No readable error log found', 'note' => 'Logging may be off (WP_DEBUG_LOG) or the host keeps logs in its control panel.' );
@@ -1464,7 +1481,7 @@ class NomadSA_Audit_Tools {
 			'post_type'      => $type,
 			'post_status'    => ! empty( $args['status'] ) ? sanitize_key( $args['status'] ) : ( 'attachment' === $type ? 'inherit' : 'publish' ),
 			'posts_per_page' => $limit,
-			's'              => isset( $args['search'] ) ? (string) $args['search'] : '',
+			's'              => sanitize_text_field( $args['search'] ?? '' ),
 		);
 		$out = array();
 		foreach ( get_posts( $q ) as $p ) {
@@ -1501,7 +1518,7 @@ class NomadSA_Audit_Tools {
 		$it->setMaxDepth( $depth - 1 );
 		foreach ( $it as $f ) {
 			$path = wp_normalize_path( $f->getPathname() );
-			if ( NomadSA_Tools::is_sensitive_path( $path ) ) {
+			if ( $f->isLink() || NomadSA_Tools::is_sensitive_path( $path ) ) {
 				continue;
 			}
 			$out[] = array(
@@ -1523,7 +1540,7 @@ class NomadSA_Audit_Tools {
 		if ( is_wp_error( $path ) ) {
 			return $path;
 		}
-		if ( ! is_file( $path ) ) {
+		if ( ! is_file( $path ) || ! is_readable( $path ) ) {
 			return new WP_Error( 'nomadsa_path', 'Not a file.' );
 		}
 		if ( filesize( $path ) > 5 * MB_IN_BYTES ) {
@@ -1546,14 +1563,17 @@ class NomadSA_Audit_Tools {
 	}
 
 	public static function search_code( $args ) {
-		$root = NomadSA_Tools::resolve_path( $args['path'] ?? 'wp-content' );
+		$root = NomadSA_Tools::resolve_path( $args['path'] ?? '@content' );
 		if ( is_wp_error( $root ) ) {
 			return $root;
 		}
-		$pattern = (string) $args['pattern'];
+		$pattern = $args['pattern'];
+		if ( '' === $pattern ) {
+			return new WP_Error( 'nomadsa_pattern', 'Search pattern cannot be empty.' );
+		}
 		$is_re   = ! empty( $args['regex'] );
 		if ( $is_re ) {
-			$re = '~' . str_replace( '~', '\~', $pattern ) . '~i';
+			$re = '~(*LIMIT_MATCH=10000)(*LIMIT_DEPTH=100)' . str_replace( '~', '\~', $pattern ) . '~i';
 			if ( false === @preg_match( $re, '' ) ) {
 				return new WP_Error( 'nomadsa_regex', 'Invalid regular expression.' );
 			}
@@ -1565,7 +1585,7 @@ class NomadSA_Audit_Tools {
 		$it   = is_dir( $root ) ? new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ) ) : array( new SplFileInfo( $root ) );
 		foreach ( $it as $f ) {
 			$path = wp_normalize_path( $f->getPathname() );
-			if ( ! in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), $exts, true ) || NomadSA_Tools::is_sensitive_path( $path ) || $f->getSize() > MB_IN_BYTES ) {
+			if ( $f->isLink() || ! $f->isFile() || ! in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), $exts, true ) || NomadSA_Tools::is_sensitive_path( $path ) || $f->getSize() > MB_IN_BYTES ) {
 				continue;
 			}
 			if ( ++$files > 20000 ) {
@@ -1576,7 +1596,7 @@ class NomadSA_Audit_Tools {
 				continue;
 			}
 			foreach ( $lines as $i => $line ) {
-				$match = $is_re ? preg_match( $re, $line ) : ( false !== stripos( $line, $pattern ) );
+				$match = $is_re ? @preg_match( $re, $line ) : ( false !== stripos( $line, $pattern ) );
 				if ( $match ) {
 					$hits[] = array( 'file' => NomadSA_Tools::relative( $path ), 'line' => $i + 1, 'text' => mb_substr( trim( NomadSA_Tools::redact( $line ) ), 0, 240 ) );
 					if ( count( $hits ) >= $max ) {
@@ -1598,12 +1618,5 @@ class NomadSA_Audit_Tools {
 			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, user_id, tool, kind, status, summary FROM %i ORDER BY id DESC LIMIT %d', NomadSA_DB::table( 'log' ), $limit ), ARRAY_A );
 		}
 		return array( 'summary' => count( $rows ) . ' entries (times in UTC)', 'entries' => $rows );
-	}
-
-	public static function list_backups( $args ) {
-		global $wpdb;
-		$limit = NomadSA_Tools::int_arg( $args, 'limit', 50, 1, 500 );
-		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, kind, target, LENGTH(content) AS stored_bytes FROM %i ORDER BY id DESC LIMIT %d', NomadSA_DB::table( 'backups' ), $limit ), ARRAY_A );
-		return array( 'summary' => count( $rows ) . ' backups', 'backups' => $rows );
 	}
 }

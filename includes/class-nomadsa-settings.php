@@ -2,18 +2,15 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Plugin settings (how the connection behaves) and runtime fixes (what has been applied to the site).
+ * Connector settings and legacy hardening preferences.
  */
 class NomadSA_Settings {
 
 	public static function defaults() {
 		return array(
 			'enabled'          => true,
-			'allow_fixes'      => false,
 			'allowed_hosts'    => 'claude.ai, claude.com, localhost, 127.0.0.1',
 			'wpscan_token'     => '',
-			'fixes_until'      => 0,
-			'connect_until'    => 0,
 			'token_lifetime'   => 3600,
 			'refresh_lifetime' => 30 * DAY_IN_SECONDS,
 		);
@@ -36,8 +33,6 @@ class NomadSA_Settings {
 			'disable_file_editor'     => false,
 			'hide_wp_version'         => false,
 			'block_user_enumeration'  => false,
-			'remove_core_info_files'  => false,
-			'custom_css'              => '',
 		);
 	}
 
@@ -46,22 +41,24 @@ class NomadSA_Settings {
 		return null === $key ? $r : ( $r[ $key ] ?? null );
 	}
 
-	public static function update_runtime( array $values ) {
-		update_option( 'nomadsa_runtime', array_merge( self::runtime(), $values ) );
-	}
-
 	public static function allowed_hosts() {
 		return array_filter( array_map( 'trim', explode( ',', strtolower( (string) self::get( 'allowed_hosts' ) ) ) ) );
 	}
 
-	/** Fixes are allowed only while switched on and within their 24 hour window. */
-	public static function fixes_active() {
-		return (bool) self::get( 'allow_fixes' ) && (int) self::get( 'fixes_until' ) > time();
+	public static function connection_deadline() {
+		return (int) get_option( 'nomadsa_connect_until', 0 );
 	}
 
-	/** New connections are accepted only for a short time after an administrator opens the window. */
+	public static function open_connection_window() {
+		update_option( 'nomadsa_connect_until', time() + 15 * MINUTE_IN_SECONDS, false );
+	}
+
 	public static function connect_window_open() {
-		return (int) self::get( 'connect_until' ) > time();
+		return self::connection_deadline() > time();
+	}
+
+	public static function consume_connection_window() {
+		return self::connect_window_open() && delete_option( 'nomadsa_connect_until' );
 	}
 
 	public static function mcp_url() {

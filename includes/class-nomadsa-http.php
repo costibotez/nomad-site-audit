@@ -15,35 +15,28 @@ class NomadSA_HTTP {
 		return strtoupper( self::server( 'REQUEST_METHOD', 'GET' ) );
 	}
 
-	/** Path of the current request relative to the site home, without trailing slash. */
-	public static function request_path() {
-		$path = (string) wp_parse_url( esc_url_raw( self::server( 'REQUEST_URI', '/' ) ), PHP_URL_PATH );
-		$home = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
-		$home = rtrim( $home, '/' );
-		if ( '' !== $home && 0 === strpos( $path, $home ) ) {
-			$path = substr( $path, strlen( $home ) );
-		}
-		$path = '/' . trim( $path, '/' );
-		return $path;
-	}
-
 	public static function route() {
-		$path = self::request_path();
+		$path = untrailingslashit( (string) wp_parse_url( esc_url_raw( self::server( 'REQUEST_URI', '/' ) ), PHP_URL_PATH ) );
 
-		if ( 0 === strpos( $path, '/.well-known/oauth-protected-resource' ) ) {
+		$resource = NomadSA_WellKnown::path( 'oauth-protected-resource', NomadSA_Settings::mcp_url() );
+		if ( $path === $resource || $path === self::url_path( '/nsa-oauth/resource' ) ) {
 			self::cors();
-			self::json( NomadSA_OAuth::protected_resource_metadata() );
+			self::metadata( NomadSA_OAuth::protected_resource_metadata() );
 		}
-		if ( 0 === strpos( $path, '/.well-known/oauth-authorization-server' ) || 0 === strpos( $path, '/.well-known/openid-configuration' ) ) {
+		if ( $path === NomadSA_WellKnown::authorization_path() ) {
 			self::cors();
-			self::json( NomadSA_OAuth::authorization_server_metadata() );
+			self::metadata( NomadSA_OAuth::authorization_server_metadata() );
+		}
+
+		$home = untrailingslashit( (string) wp_parse_url( home_url(), PHP_URL_PATH ) );
+		if ( '' !== $home ) {
+			if ( 0 !== strpos( $path, $home . '/' ) ) {
+				return;
+			}
+			$path = substr( $path, strlen( $home ) );
 		}
 
 		switch ( $path ) {
-			case '/nsa-oauth/resource':
-				self::cors();
-				self::json( NomadSA_OAuth::protected_resource_metadata() );
-				exit;
 			case '/nsa-oauth/authorize':
 				NomadSA_OAuth::authorize();
 				exit;
@@ -56,10 +49,33 @@ class NomadSA_HTTP {
 				NomadSA_OAuth::register();
 				exit;
 			case '/nsa-mcp':
+				self::validate_origin();
 				self::cors();
 				NomadSA_MCP::handle();
 				exit;
 		}
+	}
+
+	private static function validate_origin() {
+		$origin = self::server( 'HTTP_ORIGIN' );
+		if ( '' === $origin || $origin === NomadSA_WellKnown::origin() ) {
+			return;
+		}
+		$parts = wp_parse_url( $origin );
+		if ( ! $parts || isset( $parts['path'] ) || isset( $parts['query'] ) || ! NomadSA_OAuth::redirect_allowed( $origin ) ) {
+			self::json( array( 'error' => 'This request origin is not allowed.' ), 403 );
+		}
+	}
+
+	private static function url_path( $path ) {
+		return (string) wp_parse_url( home_url( $path ), PHP_URL_PATH );
+	}
+
+	private static function metadata( array $document ) {
+		if ( ! in_array( self::method(), array( 'GET', 'HEAD' ), true ) ) {
+			self::json( array( 'error' => 'Use GET.' ), 405, array( 'Allow' => 'GET, HEAD, OPTIONS' ) );
+		}
+		self::json( $document );
 	}
 
 	public static function cors() {
@@ -84,7 +100,10 @@ class NomadSA_HTTP {
 				header( $name . ': ' . $value );
 			}
 		}
-		echo wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		if ( 'HEAD' !== self::method() ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON response, never rendered as HTML.
+			echo wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		}
 		exit;
 	}
 
@@ -106,28 +125,40 @@ class NomadSA_HTTP {
 			}
 		}
 		foreach ( $candidates as $h ) {
-			if ( preg_match( '/^Bearer\s+(\S+)$/i', trim( (string) $h ), $m ) ) {
+			if ( is_string( $h ) && preg_match( '/^Bearer[ \t]+([A-Za-z0-9_~-]{1,128})$/iD', trim( $h ), $m ) ) {
 				return $m[1];
 			}
 		}
 		return '';
 	}
 
+	/** Bounded JSON transport decoder. Callers validate their message fields and arguments. */
+	public static function json_body() {
+		$raw = self::read_body();
+		return null === $raw ? null : json_decode( $raw, false, 32 );
+	}
+
+	/** OAuth parameters are validated separately for registration and token exchange. */
 	public static function body_params() {
-		$type = strtolower( self::server( 'CONTENT_TYPE' ) );
-		$raw  = file_get_contents( 'php://input' );
-		if ( false !== strpos( $type, 'application/json' ) ) {
-			$data = json_decode( (string) $raw, true );
-			return is_array( $data ) ? $data : array();
+		$type = strtolower( trim( explode( ';', self::server( 'CONTENT_TYPE' ), 2 )[0] ) );
+		if ( 'application/json' === $type ) {
+			$data = self::json_body();
+			return $data instanceof stdClass ? get_object_vars( $data ) : array();
 		}
-		// OAuth token and registration requests come from Claude's servers, not from a WordPress form,
-		// so there is no nonce; they are authenticated by the authorisation code, PKCE verifier or refresh token.
-		// phpcs:disable WordPress.Security.NonceVerification.Missing
-		if ( ! empty( $_POST ) ) {
-			return map_deep( wp_unslash( $_POST ), 'sanitize_text_field' );
+		if ( 'application/x-www-form-urlencoded' !== $type ) {
+			return array();
 		}
-		// phpcs:enable WordPress.Security.NonceVerification.Missing
-		parse_str( (string) $raw, $data );
+		$raw = self::read_body();
+		if ( null === $raw || substr_count( $raw, '&' ) >= 50 ) {
+			return array();
+		}
+		parse_str( $raw, $data );
 		return $data;
+	}
+
+	private static function read_body() {
+		$limit = 64 * KB_IN_BYTES;
+		$raw   = file_get_contents( 'php://input', false, null, 0, $limit + 1 );
+		return false !== $raw && strlen( $raw ) <= $limit ? $raw : null;
 	}
 }
