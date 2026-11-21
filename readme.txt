@@ -4,21 +4,21 @@ Tags: security, seo, audit, maintenance, ai
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect your site to Claude to run security, search and health audits and apply the fixes you approve, each previewed first and logged.
+Connect WordPress to Codex or Claude for read-only security, search and site health audits.
 
 == Description ==
 
-Nomad Site Audit connects a WordPress site to Claude as a custom connector. Claude can then check the live site directly, explain what it finds in plain language and, when you allow it, apply fixes. Every fix is previewed first and only applied after you approve that exact change.
+Nomad Site Audit connects WordPress to Codex or Claude over the Model Context Protocol (MCP). The client can check the live site, explain what it finds and guide you to the WordPress or hosting settings where you can apply recommendations.
 
 It was built for freelancers, agencies and site owners who look after WordPress sites month after month and want the routine checks done faster and explained better.
 
 = Security audit =
 
-* About 30 checks, each returned as pass, warning or fail with a plain explanation: updates, inactive plugins and unused themes, PHP version, HTTPS and SSL certificate expiry, debug settings, a public error log, the dashboard code editor, wp-config.php permissions, security keys, PHP files in uploads, folder browsing, easy to guess usernames, administrator count, open registration, username listing, XML-RPC, browser security headers and version disclosure
+* Security checks with a plain explanation of each result, covering updates, inactive plugins and unused themes, PHP version, HTTPS and SSL certificate expiry, debug settings, a public error log, the dashboard code editor, wp-config.php permissions, PHP files in uploads, folder browsing, easy to guess usernames, administrator count, open registration, username listing, XML-RPC, browser security headers and version disclosure
 * Malware scan for obfuscated code, web shells, encoded blobs, remote includes, PHP hidden in images and recently changed PHP files
 * File verification against official WordPress.org checksums for WordPress itself and for plugins hosted on WordPress.org
 * Optional known vulnerability checks for plugins with a WPScan token
@@ -34,36 +34,39 @@ It was built for freelancers, agencies and site owners who look after WordPress 
 * Site overview, database health, scheduled tasks, error log and users
 * Read only file browsing, file reading and code search for reviewing themes and plugins
 
-= Fixes you approve =
+= Audit history and monitoring =
 
-* Plugin, theme and WordPress updates, with a homepage check after every update
-* Activate, deactivate or delete plugins, delete unused themes and remove leftover files in uploads
-* Security hardening: switch off XML-RPC and the dashboard code editor, hide the WordPress version, stop username listing and remove readme.html and license.txt
-* Browser security headers with a safe recommended preset
-* Search titles, meta descriptions and noindex through Yoast SEO or Rank Math plus image alt text in bulk
-* Find and replace in page content, including Elementor data
-* Edits to child theme and must-use plugin files, with a PHP syntax check before saving and automatic rollback if the homepage breaks
-* Custom CSS, selected site settings, database clean up, cache clearing and undo for every backed up change
+* Save manual audit snapshots and pin a baseline to see new, worsened, recurring, resolved, or unverified findings.
+* Follow the remediation checklist to the relevant WordPress screen and recheck findings after making changes.
+* Download a standalone branded HTML report or preview it and print it to PDF in your browser.
+* Enable weekly audit digests for high-priority findings and regressions.
+* Monitor up to five public pages daily for response time, HTML size and HTTP status. Optional Chrome UX Report data adds mobile Core Web Vitals (LCP, INP, CLS).
 
-= Safe by design =
+Open Tools, Nomad Site Audit to run your first audit and configure reports, digests, and monitoring. Snapshots cover security, site-wide SEO, SEO checks on the 100 newest published posts and pages, and database health. The plugin retains 52 recent snapshots plus the pinned baseline and 90 performance samples. Scheduled jobs depend on WordPress Cron.
 
-* Every fix tool returns a preview first and changes nothing until it is confirmed
-* New connections are accepted only within 15 minutes of an administrator clicking Allow a new connection and only once per click
-* Only administrators can approve a connection and only apps on the allowed list (Claude by default) can receive one
-* Fix access switches itself off 24 hours after it is turned on
-* wp-config.php, .env files, keys, database dumps and backup archives can never be read and secrets are removed from anything that is read
-* Access tokens are stored as hashes, registrations are limited to 10 an hour and every audit, preview and applied fix is logged
-* Standard OAuth 2.1 with PKCE and refresh token rotation. No service of ours sits in between: Claude talks to your site and your site answers
+= Connection controls =
 
-Claude is a trademark of Anthropic, PBC. This plugin is an independent project and is not made, endorsed or supported by Anthropic.
+* An administrator opens a 15-minute window and approves each new connection.
+* The connector grants read-only audit access. Administrators can disconnect individual clients or switch off all access from WordPress.
+* OAuth uses PKCE, hashed tokens and refresh token rotation. The activity log records completed audits and errors without storing tool arguments.
+* File inspection blocks protected paths such as wp-config.php, .env files, private keys, common backup archives and version control folders. It redacts recognised secret patterns from file excerpts and logs. Review what you choose to share with your client.
+
+Codex and Claude are products of OpenAI and Anthropic respectively. Nomad Site Audit is an independent project.
 
 == External services ==
 
 This plugin connects to the services below. It does not send any data to the plugin author.
 
+= Codex (OpenAI) =
+
+After you approve a connection, Codex receives the results of the audit tools it requests. These can include site settings, plugin and theme lists, content metadata, file excerpts and redacted logs. During approval, WordPress may fetch Codex's client metadata from chatgpt.com to validate the callback address.
+
+* Terms of use: https://openai.com/policies/terms-of-use/
+* Privacy policy: https://openai.com/policies/privacy-policy/
+
 = Claude (Anthropic) =
 
-When you connect the site in Claude, Claude's servers send requests to this site's connector address and receive the results of the audits and fixes you ask for: site settings, plugin and theme lists, page and post titles and descriptions, file contents you ask Claude to review (with secrets removed) and the outcome of changes. Nothing is sent until an administrator approves the connection and you can disconnect at any time under Settings, Nomad Site Audit.
+After you approve a connection, Claude receives the results of the audit tools it requests. These can include site settings, plugin and theme lists, content metadata, file excerpts and redacted logs. During approval, WordPress may fetch the client metadata from the configured Claude domain to validate the callback address.
 
 * Terms of service: https://www.anthropic.com/legal/consumer-terms
 * Privacy policy: https://www.anthropic.com/legal/privacy
@@ -76,63 +79,64 @@ Used only when an audit needs it. The plugin requests plugin details from api.wo
 
 = WPScan (optional) =
 
-Only used if you enter a WPScan API token in the settings. The plugin then sends the slugs of installed plugins and your token to wpscan.com to look up known vulnerabilities. The free WPScan API is limited to 25 requests a day and to non-commercial use; commercial use needs a WPScan licence.
+Only used if you enter a WPScan API token in the settings. The plugin then sends the slugs of installed plugins and your token to wpscan.com to look up known vulnerabilities. Use of the API is subject to WPScan’s terms.
 
 * Terms of service: https://wpscan.com/terms
 * Privacy policy: https://automattic.com/privacy/
 
+= External link checks (optional) =
+
+If you request an external broken-link check, the plugin makes HTTP requests to the links found in your published content. It uses the response status to identify broken links and includes the site URL in the request’s User-Agent header.
+
+= Chrome UX Report (optional) =
+
+Only used if you save a Chrome UX Report API key in the audit settings. The plugin sends the chosen public page URLs, your API key, the mobile device category, and requested metrics to Google to retrieve aggregated Core Web Vitals.
+
+* Terms of service: https://developers.google.com/terms
+* Privacy policy: https://policies.google.com/privacy
+
 == Installation ==
 
-1. Install the plugin from Plugins, Add New, or upload the zip under Plugins, Add New, Upload Plugin, then activate it.
-2. Open Settings, Nomad Site Audit and check for the green Ready to connect tick.
-3. Tick Allow Claude to apply fixes for the next 24 hours if you want fixes. Leave it unticked for audit only access.
-4. Click Allow a new connection.
-5. In Claude, open Settings, Connectors, Add custom connector, give it the site's name and paste the connection address from the settings page.
-6. Click Connect, log in to the site when asked and click Allow.
+1. Install and activate the plugin from the WordPress Plugins screen.
+2. Open Settings, Nomad Site Audit. Copy the connection address and use Test discovery to check that your host routes the OAuth metadata URL to WordPress.
+3. Click Allow a new connection just before connecting from your client.
+4. In Codex, add a Streamable HTTP MCP server with the copied URL. From the CLI, run `codex mcp add nomad-site-audit --url https://example.com/nsa-mcp`, using the address from your site. If prompted to authenticate separately, run `codex mcp login nomad-site-audit`. In Claude, open Settings, Connectors, Add custom connector and paste the same URL.
+5. Sign in to WordPress and click Allow. Open a new connection window for each additional client.
 
-Pretty permalinks are required (any option other than Plain under Settings, Permalinks).
+Use HTTPS and pretty permalinks. Keep 127.0.0.1 and localhost in Allowed callback hosts for the default Codex OAuth flow.
 
 == Frequently Asked Questions ==
 
-= Do I need a Claude account? =
+= Can the connector change my site? =
 
-Yes. You add the site as a custom connector in Claude.
+The connection grants read-only audit access. Make changes from the WordPress dashboard or your hosting settings.
 
-= Can Claude change my site without asking? =
+= Why does the .well-known address return 404? =
 
-No. Every fix tool returns a preview first. Claude has to show it to you and call the tool again with your approval before anything changes. Fixes are also switched off by default and switch themselves off 24 hours after you turn them on.
-
-= What can never be read? =
-
-wp-config.php, .env files, private keys, database dumps, backup archives and version control folders. Anything that looks like a password, key or token is removed from files and logs before they leave the site.
-
-= Can I undo a change? =
-
-Changes to files, search titles, alt text, page content, settings and custom CSS are backed up and can be restored. Updates, deleted plugins and themes, deleted files and database clean ups cannot be undone through the connector, so keep regular site backups.
-
-= My host shows a 404 for the .well-known address =
-
-Some hosts, including SiteGround, answer /.well-known/ themselves instead of passing it to WordPress. The plugin writes its two discovery files into the .well-known folder for this reason. If the settings page still shows a warning, flush the host cache and reload.
-
-= Updates fail with a message about FTP details =
-
-Updates through Claude need direct file access, which is the normal setup on most managed hosts. Sites that ask for FTP details when updating can still be audited; run updates from the dashboard instead.
+Some hosts handle /.well-known/ separately from WordPress. Ask your host to forward the plugin-specific discovery path shown by Test discovery to WordPress while keeping any existing discovery routes. The plugin also serves resource discovery at /nsa-oauth/resource.
 
 = How do I disconnect? =
 
-Under Settings, Nomad Site Audit, click Disconnect next to the app, or Disconnect everything. Unticking Allow connections blocks all access straight away.
-
-= Can I add my own tools? =
-
-Yes. Hook into nomadsa_register_tools and call NomadSA_Tools::register(). See the project on GitHub for an example.
+Under Settings, Nomad Site Audit, click Disconnect next to the app, or Disconnect everything. Unticking Allow connections blocks connector access.
 
 == Screenshots ==
 
-1. Settings: connection address, connection window, fix switch and allowed apps.
-2. The approval screen shown before Claude can connect.
-3. Connected apps and the activity log of audits, previews and applied fixes.
+1. Connection settings and discovery test.
+2. The WordPress approval screen.
+3. Connected apps and the audit activity log.
 
 == Changelog ==
+
+= 1.2.0 =
+* Added audit history with pinned baselines and finding comparisons.
+* Added the remediation checklist, targeted rechecks, and branded HTML reports.
+* Added opt-in weekly email digests and daily page performance monitoring with optional Chrome UX Report data.
+
+= 1.1.1 =
+* Added Codex support alongside Claude using MCP OAuth.
+* Made all connector tools read-only. Removed remote site changes, custom code and styling, file deletion and database cleanup.
+* Serve namespaced OAuth discovery through WordPress without writing files in the site root.
+* Validate OAuth and MCP inputs, omit arguments from new log entries and support custom content, theme and upload paths.
 
 = 1.1.0 =
 * Prepared for the WordPress.org plugin directory: readme, external services, coding standards
@@ -155,6 +159,9 @@ Yes. Hook into nomadsa_register_tools and call NomadSA_Tools::register(). See th
 * First release
 
 == Upgrade Notice ==
+
+= 1.1.1 =
+Connections now provide audit access only. Custom CSS from older versions stops rendering. The plugin serves discovery at new, namespaced URLs. If your host intercepts those URLs, use Test discovery for the path to forward to WordPress.
 
 = 1.1.0 =
 Internal names change in this version. Your settings, connections, activity log and backups are moved across automatically.

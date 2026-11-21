@@ -1,0 +1,70 @@
+.nomadsa-audit {
+	max-width: 1210px;
+}
+
+.nomadsa-audit .nomadsa-panel {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	margin: 16px 0;
+	padding: 12px 20px 20px;
+	scroll-margin-top: 48px;
+}
+
+.nomadsa-audit .nomadsa-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: 8px 0;
+}
+
+.nomadsa-audit .nomadsa-actions form {
+	margin: 0;
+}
+
+.nomadsa-audit #nomadsa-history form[method="get"] {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.nomadsa-audit #nomadsa-run {
+	max-width: 100%;
+	min-width: 0;
+}
+
+.nomadsa-audit .nomadsa-metrics {
+	align-items: start;
+	display: grid;
+	gap: 8px;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	margin: 12px 0;
+}
+
+.nomadsa-audit details {
+	border: 1px solid #dcdcde;
+	padding: 8px 12px;
+}
+
+.nomadsa-audit summary {
+	cursor: pointer;
+}
+
+.nomadsa-audit .nomadsa-has-findings {
+	border-top: 2px solid #2271b1;
+}
+
+.nomadsa-audit .nomadsa-table-scroll {
+	overflow-x: auto;
+}
+
+.nomadsa-audit .widefat {
+	min-width: 560px;
+}
+
+.nomadsa-audit .nomadsa-findings {
+	margin-top: 12px;
+}

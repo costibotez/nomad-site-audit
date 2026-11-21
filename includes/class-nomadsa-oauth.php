@@ -6,23 +6,23 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * A small OAuth 2.1 authorisation server (authorisation code with PKCE, dynamic client registration,
- * client ID metadata documents and refresh token rotation) so Claude can connect as a custom connector.
+ * client ID metadata documents and refresh token rotation) for Codex and Claude.
  * Only administrators can approve a connection.
  */
 class NomadSA_OAuth {
 
 	public static $current_client = '';
-	public static $current_scope  = array();
+	public static $current_user_id = 0;
 
 	public static function issuer() {
-		return untrailingslashit( home_url() );
+		return home_url( '/nsa-oauth' );
 	}
 
 	public static function protected_resource_metadata() {
 		return array(
 			'resource'                 => NomadSA_Settings::mcp_url(),
 			'authorization_servers'    => array( self::issuer() ),
-			'scopes_supported'         => array( 'audit', 'fix' ),
+			'scopes_supported'         => array( 'audit' ),
 			'bearer_methods_supported' => array( 'header' ),
 			'resource_name'            => get_bloginfo( 'name' ) . ' (Nomad Site Audit)',
 		);
@@ -31,6 +31,7 @@ class NomadSA_OAuth {
 	public static function authorization_server_metadata() {
 		return array(
 			'issuer'                                => self::issuer(),
+			'authorization_response_iss_parameter_supported' => true,
 			'authorization_endpoint'                => home_url( '/nsa-oauth/authorize' ),
 			'token_endpoint'                        => home_url( '/nsa-oauth/token' ),
 			'registration_endpoint'                 => home_url( '/nsa-oauth/register' ),
@@ -38,7 +39,7 @@ class NomadSA_OAuth {
 			'grant_types_supported'                 => array( 'authorization_code', 'refresh_token' ),
 			'code_challenge_methods_supported'      => array( 'S256' ),
 			'token_endpoint_auth_methods_supported' => array( 'none' ),
-			'scopes_supported'                      => array( 'audit', 'fix' ),
+			'scopes_supported'                      => array( 'audit' ),
 			'client_id_metadata_document_supported' => true,
 		);
 	}
@@ -63,24 +64,28 @@ class NomadSA_OAuth {
 		set_transient( 'nomadsa_register_count', $count + 1, HOUR_IN_SECONDS );
 		self::prune_clients();
 		$data = NomadSA_HTTP::body_params();
-		$uris = isset( $data['redirect_uris'] ) && is_array( $data['redirect_uris'] ) ? array_values( array_filter( $data['redirect_uris'], 'is_string' ) ) : array();
-		if ( empty( $uris ) ) {
+		$uris = $data['redirect_uris'] ?? null;
+		if ( ! is_array( $uris ) || ! $uris || count( $uris ) > 10 || array_values( $uris ) !== $uris ) {
 			NomadSA_HTTP::oauth_error( 'invalid_redirect_uri', 'At least one redirect URI is required.' );
 		}
 		foreach ( $uris as $uri ) {
 			if ( ! self::redirect_allowed( $uri ) ) {
-				NomadSA_HTTP::oauth_error( 'invalid_redirect_uri', 'Redirect URI not allowed by this site: ' . $uri );
+				NomadSA_HTTP::oauth_error( 'invalid_redirect_uri', 'A redirect URI is invalid or is not allowed by this site.' );
 			}
 		}
 		global $wpdb;
 		$client_id = 'nomadsa_' . wp_generate_password( 32, false, false );
-		$name      = isset( $data['client_name'] ) ? sanitize_text_field( $data['client_name'] ) : 'Unnamed app';
-		$wpdb->insert( NomadSA_DB::table( 'clients' ), array(
+		$name      = self::client_name( $data['client_name'] ?? null, 'Unnamed app' );
+		$saved = $wpdb->insert( NomadSA_DB::table( 'clients' ), array(
 			'client_id'     => $client_id,
-			'client_name'   => mb_substr( $name, 0, 200 ),
+			'client_name'   => $name,
 			'redirect_uris' => wp_json_encode( $uris ),
 			'created_at'    => NomadSA_DB::now(),
 		) );
+		if ( false === $saved ) {
+			NomadSA_HTTP::oauth_error( 'server_error', 'Could not register the client.', 500 );
+		}
+
 		NomadSA_HTTP::json( array(
 			'client_id'                  => $client_id,
 			'client_id_issued_at'        => time(),
@@ -104,12 +109,12 @@ class NomadSA_OAuth {
 	}
 
 	/** Returns array( name, redirect_uris ) or null. */
-	public static function get_client( $client_id ) {
+	public static function get_client( $client_id, $allow_fetch = true ) {
 		if ( '' === (string) $client_id ) {
 			return null;
 		}
 		if ( 0 === strpos( $client_id, 'https://' ) ) {
-			return self::get_metadata_client( $client_id );
+			return self::get_metadata_client( $client_id, $allow_fetch );
 		}
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE client_id = %s', NomadSA_DB::table( 'clients' ), $client_id ), ARRAY_A );
@@ -123,9 +128,9 @@ class NomadSA_OAuth {
 	}
 
 	/** Client ID metadata documents: the client ID is a URL that describes the app. */
-	private static function get_metadata_client( $url ) {
+	private static function get_metadata_client( $url, $allow_fetch ) {
 		$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
-		if ( ! self::host_allowed( $host ) ) {
+		if ( ! self::is_codex_metadata( $url ) && ! self::redirect_allowed( $url ) ) {
 			return null;
 		}
 		$key    = 'nomadsa_cimd_' . md5( $url );
@@ -133,20 +138,40 @@ class NomadSA_OAuth {
 		if ( is_array( $cached ) ) {
 			return $cached;
 		}
-		$res = wp_safe_remote_get( $url, array( 'timeout' => 8, 'redirection' => 0 ) );
+		if ( ! $allow_fetch ) {
+			return self::is_codex_metadata( $url ) ? array( 'name' => 'Codex' ) : null;
+		}
+		$res = wp_safe_remote_get( $url, array( 'timeout' => 8, 'redirection' => 0, 'limit_response_size' => 32 * KB_IN_BYTES ) );
 		if ( is_wp_error( $res ) || 200 !== wp_remote_retrieve_response_code( $res ) ) {
 			return null;
 		}
 		$doc = json_decode( wp_remote_retrieve_body( $res ), true );
-		if ( ! is_array( $doc ) || ( $doc['client_id'] ?? '' ) !== $url || empty( $doc['redirect_uris'] ) ) {
+		if ( ! is_array( $doc ) || ( $doc['client_id'] ?? '' ) !== $url || ! is_array( $doc['redirect_uris'] ?? null ) ) {
 			return null;
 		}
 		$client = array(
-			'name'          => sanitize_text_field( $doc['client_name'] ?? $host ),
-			'redirect_uris' => array_values( array_filter( (array) $doc['redirect_uris'], 'is_string' ) ),
+			'name'          => self::client_name( $doc['client_name'] ?? null, $host ),
+			'redirect_uris' => array_values( array_filter( $doc['redirect_uris'], array( __CLASS__, 'redirect_allowed' ) ) ),
 		);
 		set_transient( $key, $client, DAY_IN_SECONDS );
 		return $client;
+	}
+
+	private static function is_codex_metadata( $url ) {
+		return (bool) preg_match( '#^https://chatgpt\.com/oauth/codex/(?:[A-Za-z0-9_-]{1,64}/)?client\.json$#D', $url );
+	}
+
+	/** Native clients can choose a loopback port at login. All other URI components must match. */
+	private static function matches_redirect( $uri, array $registered ) {
+		if ( in_array( $uri, $registered, true ) ) {
+			return true;
+		}
+		$parts = wp_parse_url( $uri );
+		if ( 'http' !== $parts['scheme'] || ! in_array( strtolower( $parts['host'] ), array( 'localhost', '127.0.0.1', '[::1]' ), true ) ) {
+			return false;
+		}
+		$portless = preg_replace( '#^(http://(?:localhost|127\.0\.0\.1|\[::1\])):[0-9]+(?=/|$)#i', '$1', $uri );
+		return $portless !== $uri && in_array( $portless, $registered, true );
 	}
 
 	public static function host_allowed( $host ) {
@@ -159,11 +184,22 @@ class NomadSA_OAuth {
 		return false;
 	}
 
-	public static function redirect_allowed( $uri ) {
-		$parts = wp_parse_url( $uri );
-		if ( empty( $parts['scheme'] ) || empty( $parts['host'] ) || ! empty( $parts['fragment'] ) ) {
+	private static function valid_url( $uri ) {
+		if ( ! is_string( $uri ) || '' === $uri || strlen( $uri ) > 2048
+			|| preg_match( '/[[:cntrl:] ]|\\\\/', $uri )
+			|| $uri !== esc_url_raw( $uri, array( 'http', 'https' ) ) ) {
 			return false;
 		}
+		$parts = wp_parse_url( $uri );
+		return ! empty( $parts['scheme'] ) && ! empty( $parts['host'] )
+			&& ! isset( $parts['fragment'] ) && ! isset( $parts['user'] ) && ! isset( $parts['pass'] );
+	}
+
+	public static function redirect_allowed( $uri ) {
+		if ( ! self::valid_url( $uri ) ) {
+			return false;
+		}
+		$parts    = wp_parse_url( $uri );
 		$host     = strtolower( $parts['host'] );
 		$is_local = in_array( $host, array( 'localhost', '127.0.0.1', '[::1]' ), true );
 		if ( 'https' !== $parts['scheme'] && ! ( 'http' === $parts['scheme'] && $is_local ) ) {
@@ -172,33 +208,41 @@ class NomadSA_OAuth {
 		return self::host_allowed( $host );
 	}
 
+	private static function client_name( $name, $default ) {
+		return is_string( $name ) ? ( wp_html_excerpt( sanitize_text_field( $name ), 200 ) ?: $default ) : $default;
+	}
+
+	private static function valid_client_id( $id ) {
+		return is_string( $id ) && strlen( $id ) <= 191 && (
+			preg_match( '/^[A-Za-z0-9_-]+$/D', $id )
+			|| ( 0 === strpos( $id, 'https://' ) && self::valid_url( $id ) )
+		);
+	}
+
 	/* ---------------------------------------------------------------- Authorise */
 
 	public static function authorize() {
 		nocache_headers();
+		$method = NomadSA_HTTP::method();
+		if ( ! in_array( $method, array( 'GET', 'POST' ), true ) ) {
+			NomadSA_HTTP::oauth_error( 'invalid_request', 'Use GET or POST.', 405 );
+		}
 		$p = array();
-		foreach ( array( 'response_type', 'client_id', 'redirect_uri', 'state', 'scope', 'code_challenge', 'code_challenge_method', 'resource' ) as $k ) {
-			// Authorisation request parameters arrive from Claude in the address; the approval form below has its own nonce.
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			$p[ $k ] = isset( $_REQUEST[ $k ] ) ? sanitize_text_field( wp_unslash( $_REQUEST[ $k ] ) ) : '';
+		foreach ( array( 'response_type', 'client_id', 'redirect_uri', 'state', 'scope', 'code_challenge', 'code_challenge_method', 'resource' ) as $key ) {
+			// The approval form posts back to this query string and verifies a request-bound nonce.
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Exact protocol values are validated below.
+			$value = wp_unslash( $_GET[ $key ] ?? '' );
+			if ( ! is_string( $value ) || strlen( $value ) > 2048 || preg_match( '/[^ -~]/', $value ) ) {
+				NomadSA_HTTP::oauth_error( 'invalid_request', 'Malformed authorization parameter.' );
+			}
+			$p[ $key ] = $value;
+		}
+		if ( ! self::valid_client_id( $p['client_id'] ) || ! self::redirect_allowed( $p['redirect_uri'] ) ) {
+			self::page( 'Address not allowed', '<p>The app identifier or return address is invalid or is not on the allowed list.</p>' );
 		}
 
 		if ( ! NomadSA_Settings::get( 'enabled' ) ) {
-			self::page( 'Connector switched off', '<p>The Claude connector is switched off on this site. An administrator can switch it on under Settings, Nomad Site Audit.</p>' );
-		}
-
-		$client = self::get_client( $p['client_id'] );
-		if ( ! $client ) {
-			self::page( 'Unknown app', '<p>This app is not registered with this site.</p>' );
-		}
-		if ( ! in_array( $p['redirect_uri'], $client['redirect_uris'], true ) || ! self::redirect_allowed( $p['redirect_uri'] ) ) {
-			self::page( 'Address not allowed', '<p>The return address for this app is not on the allowed list for this site.</p>' );
-		}
-		if ( 'code' !== $p['response_type'] ) {
-			self::redirect_error( $p, 'unsupported_response_type', 'Only the authorisation code flow is supported.' );
-		}
-		if ( '' === $p['code_challenge'] || 'S256' !== $p['code_challenge_method'] ) {
-			self::redirect_error( $p, 'invalid_request', 'PKCE with S256 is required.' );
+			self::page( 'Connector switched off', '<p>The audit connector is switched off on this site. An administrator can switch it on under Settings, Nomad Site Audit.</p>' );
 		}
 
 		if ( ! is_user_logged_in() ) {
@@ -207,35 +251,52 @@ class NomadSA_OAuth {
 			exit;
 		}
 		if ( ! current_user_can( 'manage_options' ) ) {
-			self::page( 'Administrator required', '<p>Only an administrator can connect this site to Claude.</p>' );
+			self::page( 'Administrator required', '<p>Only an administrator can approve connections.</p>' );
 		}
 		if ( ! NomadSA_Settings::connect_window_open() ) {
-			self::page( 'New connections are closed', '<p>For safety, this site only accepts a new connection for 15 minutes after an administrator allows it.</p><p>If you started this connection yourself, go to <a href="' . esc_url( admin_url( 'options-general.php?page=nomad-site-audit' ) ) . '">Settings, Nomad Site Audit</a>, click <strong>Allow a new connection</strong>, then connect again from Claude.</p><p class="note">If you did not start this, someone may be trying to get access to your site. Close this page.</p>' );
+			self::page( 'New connections are closed', '<p>For safety, this site only accepts a new connection for 15 minutes after an administrator allows it.</p><p>If you started this connection yourself, go to <a href="' . esc_url( admin_url( 'options-general.php?page=nomad-site-audit' ) ) . '">Settings, Nomad Site Audit</a>, click <strong>Allow a new connection</strong>, then connect again from your MCP client.</p><p class="note">If you did not start this, someone may be trying to get access to your site. Close this page.</p>' );
 		}
 
-		$fixes_on  = NomadSA_Settings::fixes_active();
-		$requested = array_filter( explode( ' ', $p['scope'] ) );
-		$want_fix  = empty( $requested ) || in_array( 'fix', $requested, true );
+		$client = self::get_client( $p['client_id'] );
+		if ( ! $client ) {
+			self::page( 'Unknown app', '<p>This app is not registered with this site.</p>' );
+		}
+		if ( ! self::matches_redirect( $p['redirect_uri'], $client['redirect_uris'] ) ) {
+			self::page( 'Address not allowed', '<p>The return address does not match the registered app.</p>' );
+		}
+		if ( 'code' !== $p['response_type'] ) {
+			self::redirect_error( $p, 'unsupported_response_type', 'Only the authorisation code flow is supported.' );
+		}
+		if ( ! preg_match( '/^[A-Za-z0-9_-]{43}$/D', $p['code_challenge'] ) || 'S256' !== $p['code_challenge_method'] ) {
+			self::redirect_error( $p, 'invalid_request', 'PKCE with S256 is required.' );
+		}
 
-		if ( 'POST' === NomadSA_HTTP::method() ) {
-			check_admin_referer( 'nomadsa_authorize' );
+		if ( '' !== $p['resource'] && NomadSA_Settings::mcp_url() !== $p['resource'] ) {
+			self::redirect_error( $p, 'invalid_target', 'The connector resource does not match.' );
+		}
+		if ( '' !== $p['scope'] && ! in_array( 'audit', explode( ' ', $p['scope'] ), true ) ) {
+			self::redirect_error( $p, 'invalid_scope', 'This connector offers the audit scope.' );
+		}
+
+		$nonce_action = 'nomadsa_authorize_' . hash( 'sha256', wp_json_encode( $p ) );
+		if ( 'POST' === $method ) {
+			check_admin_referer( $nonce_action );
 			if ( empty( $_POST['approve'] ) ) {
 				self::redirect_error( $p, 'access_denied', 'The administrator declined the connection.' );
 			}
-			$scope = array( 'audit' );
-			if ( $fixes_on && $want_fix && ! empty( $_POST['grant_fix'] ) ) {
-				$scope[] = 'fix';
+			if ( ! NomadSA_Settings::consume_connection_window() ) {
+				self::redirect_error( $p, 'access_denied', 'The connection window has already been used.' );
 			}
 			$code = wp_generate_password( 48, false, false );
-			set_transient( 'nomadsa_code_' . hash( 'sha256', $code ), array(
+			$saved = set_transient( 'nomadsa_code_' . hash( 'sha256', $code ), array(
 				'client_id'      => $p['client_id'],
 				'redirect_uri'   => $p['redirect_uri'],
 				'code_challenge' => $p['code_challenge'],
 				'user_id'        => get_current_user_id(),
-				'scope'          => implode( ' ', $scope ),
 			), 10 * MINUTE_IN_SECONDS );
-			// One approval per window: close it so a second request needs a new decision.
-			NomadSA_Settings::update( array( 'connect_until' => 0 ) );
+			if ( ! $saved ) {
+				self::redirect_error( $p, 'server_error', 'Could not save the authorization code. Open a new connection window and try again.' );
+			}
 			self::redirect_to_client( $p['redirect_uri'], array(
 				'code'  => $code,
 				'state' => $p['state'],
@@ -248,17 +309,12 @@ class NomadSA_OAuth {
 		$back  = esc_html( wp_parse_url( $p['redirect_uri'], PHP_URL_HOST ) );
 		$site  = esc_html( get_bloginfo( 'name' ) );
 		$html  = '<p><strong>' . $app . '</strong> (' . $back . ') wants to connect to <strong>' . $site . '</strong> as ' . esc_html( $user->user_login ) . '.</p>';
-		$html .= '<form method="post">' . wp_nonce_field( 'nomadsa_authorize', '_wpnonce', true, false );
-		$html .= '<div class="scope"><label><input type="checkbox" checked disabled> <strong>Audit</strong>: read settings, plugins, content and code to check security, search and site health. Secret keys and passwords are never shared.</label></div>';
-		if ( $fixes_on && $want_fix ) {
-			$html .= '<div class="scope"><label><input type="checkbox" name="grant_fix" value="1" checked> <strong>Fix</strong>: apply changes such as updates, security settings and search titles. Each change is previewed first, logged and backed up where possible.</label></div>';
-		} elseif ( ! $fixes_on ) {
-			$html .= '<p class="note">Fixes are switched off on this site, so this connection can only audit. You can switch them on under Settings, Nomad Site Audit.</p>';
-		}
+		$html .= '<form method="post">' . wp_nonce_field( $nonce_action, '_wpnonce', false, false );
+		$html .= '<p><strong>Read-only audit access</strong> includes site settings, plugins, content, files, and logs used to check security, search, and site health.</p>';
 		$html .= '<p class="note"><strong>Only click Allow if you started this connection yourself in the last few minutes.</strong> If someone sent you this link, click Deny.</p>';
 		$html .= '<p><button class="primary" name="approve" value="1">Allow</button> <button name="deny" value="1">Deny</button></p></form>';
 		$html .= '<p class="note">You can disconnect at any time under Settings, Nomad Site Audit.</p>';
-		self::page( 'Connect to Claude', $html );
+		self::page( 'Connect to Nomad Site Audit', $html );
 	}
 
 	private static function redirect_to_client( $uri, array $params ) {
@@ -300,19 +356,15 @@ class NomadSA_OAuth {
 	}
 
 	private static function page( $title, $body ) {
-		status_header( 200 );
-		header( 'Content-Type: text/html; charset=utf-8' );
 		header( 'X-Frame-Options: DENY' );
-		echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">';
-		echo '<title>' . esc_html( $title ) . '</title><style>
-			body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f3f4f6;color:#1f2937;margin:0;padding:40px 16px}
-			.box{max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-			h1{font-size:20px;margin:0 0 16px}.scope{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:10px 0}
-			button{font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
-			button.primary{background:#2563eb;border-color:#2563eb;color:#fff}.note{color:#6b7280;font-size:14px}
-		</style></head><body><div class="box"><h1>' . esc_html( $title ) . '</h1>' . wp_kses( $body, self::page_allowed_html() ) . '</div></body></html>';
-		exit;
+		header( 'X-Robots-Tag: noindex' );
+		wp_die(
+			'<h1>' . esc_html( $title ) . '</h1>' . wp_kses( $body, self::page_allowed_html() ),
+			esc_html( $title ),
+			array( 'response' => 200 )
+		);
 	}
+
 
 	/* ---------------------------------------------------------------- Tokens */
 
@@ -320,43 +372,56 @@ class NomadSA_OAuth {
 		if ( 'POST' !== NomadSA_HTTP::method() ) {
 			NomadSA_HTTP::oauth_error( 'invalid_request', 'Use POST.', 405 );
 		}
-		$d     = NomadSA_HTTP::body_params();
-		$grant = (string) ( $d['grant_type'] ?? '' );
-
-		if ( 'authorization_code' === $grant ) {
-			$code = (string) ( $d['code'] ?? '' );
-			$key  = 'nomadsa_code_' . hash( 'sha256', $code );
-			$data = get_transient( $key );
-			delete_transient( $key ); // Single use.
-			if ( ! is_array( $data ) ) {
-				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The code is invalid or has expired.' );
-			}
-			if ( ( $d['client_id'] ?? '' ) !== $data['client_id'] || ( $d['redirect_uri'] ?? '' ) !== $data['redirect_uri'] ) {
-				NomadSA_HTTP::oauth_error( 'invalid_grant', 'Client or redirect URI does not match.' );
-			}
-			$verifier  = (string) ( $d['code_verifier'] ?? '' );
-			$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
-			if ( '' === $verifier || ! hash_equals( $data['code_challenge'], $challenge ) ) {
-				NomadSA_HTTP::oauth_error( 'invalid_grant', 'PKCE verification failed.' );
-			}
-			NomadSA_HTTP::json( self::issue_tokens( $data['client_id'], (int) $data['user_id'], $data['scope'] ) );
+		if ( ! NomadSA_Settings::get( 'enabled' ) ) {
+			NomadSA_HTTP::oauth_error( 'access_denied', 'The connector is switched off on this site.', 403 );
+		}
+		$d = NomadSA_HTTP::body_params();
+		$client_id = $d['client_id'] ?? '';
+		if ( isset( $d['client_id'] ) && ! self::valid_client_id( $client_id ) ) {
+			NomadSA_HTTP::oauth_error( 'invalid_client', 'The client identifier is invalid.' );
+		}
+		if ( isset( $d['resource'] ) && NomadSA_Settings::mcp_url() !== $d['resource'] ) {
+			NomadSA_HTTP::oauth_error( 'invalid_target', 'The connector resource does not match.' );
 		}
 
-		if ( 'refresh_token' === $grant ) {
-			$row = self::find_token( (string) ( $d['refresh_token'] ?? '' ), 'refresh' );
-			if ( ! $row || ( isset( $d['client_id'] ) && $d['client_id'] !== $row['client_id'] ) ) {
+		if ( 'authorization_code' === ( $d['grant_type'] ?? '' ) ) {
+			$code = $d['code'] ?? null;
+			$verifier = $d['code_verifier'] ?? null;
+			if ( ! is_string( $code ) || ! preg_match( '/^[A-Za-z0-9]{48}$/D', $code )
+				|| ! is_string( $verifier ) || ! preg_match( '/^[A-Za-z0-9._~-]{43,128}$/D', $verifier )
+				|| ! self::redirect_allowed( $d['redirect_uri'] ?? null ) ) {
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The authorization code, redirect URI or PKCE verifier is invalid.' );
+			}
+			$key = 'nomadsa_code_' . hash( 'sha256', $code );
+			$data = get_transient( $key );
+			if ( ! is_array( $data ) || $client_id !== $data['client_id'] || $d['redirect_uri'] !== $data['redirect_uri'] ) {
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The authorization code is expired or does not match the client.' );
+			}
+			$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
+			if ( ! hash_equals( $data['code_challenge'], $challenge ) || ! self::is_auditor( $data['user_id'] )
+				|| ! delete_transient( $key ) ) {
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The code is no longer valid for this request.' );
+			}
+			NomadSA_HTTP::json( self::issue_tokens( $data['client_id'], (int) $data['user_id'] ) );
+		}
+
+		if ( 'refresh_token' === ( $d['grant_type'] ?? '' ) ) {
+			$row = self::find_token( $d['refresh_token'] ?? null, 'refresh' );
+			if ( ! $row || ( '' !== $client_id && $client_id !== $row['client_id'] ) || ! self::is_auditor( $row['user_id'] ) ) {
 				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The refresh token is invalid or has expired.' );
 			}
 			global $wpdb;
-			$wpdb->update( NomadSA_DB::table( 'tokens' ), array( 'revoked' => 1 ), array( 'id' => $row['id'] ) ); // Rotation.
-			// The fix scope is kept; whether fixes work is decided on every call by the 24 hour switch.
-			NomadSA_HTTP::json( self::issue_tokens( $row['client_id'], (int) $row['user_id'], $row['scope'] ) );
+			$rotated = $wpdb->update( NomadSA_DB::table( 'tokens' ), array( 'revoked' => 1 ), array( 'id' => $row['id'], 'revoked' => 0 ) );
+			if ( 1 !== $rotated ) {
+				NomadSA_HTTP::oauth_error( 'invalid_grant', 'The refresh token has already been used.' );
+			}
+			NomadSA_HTTP::json( self::issue_tokens( $row['client_id'], (int) $row['user_id'] ) );
 		}
 
 		NomadSA_HTTP::oauth_error( 'unsupported_grant_type', 'Unsupported grant type.' );
 	}
 
-	private static function issue_tokens( $client_id, $user_id, $scope ) {
+	private static function issue_tokens( $client_id, $user_id ) {
 		global $wpdb;
 		$access  = 'nomadsa_at_' . wp_generate_password( 48, false, false );
 		$refresh = 'nomadsa_rt_' . wp_generate_password( 48, false, false );
@@ -367,7 +432,7 @@ class NomadSA_OAuth {
 				'kind'       => $t[1],
 				'client_id'  => $client_id,
 				'user_id'    => $user_id,
-				'scope'      => $scope,
+				'scope'      => 'audit',
 				'expires_at' => gmdate( 'Y-m-d H:i:s', time() + $t[2] ),
 				'created_at' => NomadSA_DB::now(),
 			) );
@@ -379,12 +444,12 @@ class NomadSA_OAuth {
 			'token_type'    => 'Bearer',
 			'expires_in'    => $life,
 			'refresh_token' => $refresh,
-			'scope'         => $scope,
+			'scope'         => 'audit',
 		);
 	}
 
 	private static function find_token( $token, $kind ) {
-		if ( '' === $token ) {
+		if ( ! is_string( $token ) || ! preg_match( '/^[A-Za-z0-9_~-]{1,128}$/D', $token ) ) {
 			return null;
 		}
 		global $wpdb;
@@ -395,22 +460,19 @@ class NomadSA_OAuth {
 		return $row ?: null;
 	}
 
-	/** Validates the Bearer token on an MCP request and signs in its user. Returns true or false. */
+	/** Validates the credential without setting a WordPress login or current user. */
 	public static function authenticate_request() {
 		if ( ! NomadSA_Settings::get( 'enabled' ) ) {
 			return false;
 		}
 		$row = self::find_token( NomadSA_HTTP::bearer_token(), 'access' );
-		if ( ! $row ) {
+		if ( ! $row || ! self::is_auditor( $row['user_id'] )
+			|| ! in_array( 'audit', explode( ' ', $row['scope'] ), true ) ) {
 			return false;
 		}
-		$user = get_user_by( 'id', (int) $row['user_id'] );
-		if ( ! $user || ! user_can( $user, 'manage_options' ) ) {
-			return false;
-		}
-		wp_set_current_user( $user->ID );
-		self::$current_client = $row['client_id'];
-		self::$current_scope  = array_filter( explode( ' ', $row['scope'] ) );
+		self::$current_client  = $row['client_id'];
+		self::$current_user_id = (int) $row['user_id'];
+
 		if ( empty( $row['last_used_at'] ) || strtotime( $row['last_used_at'] . ' UTC' ) < time() - 300 ) {
 			global $wpdb;
 			$wpdb->update( NomadSA_DB::table( 'tokens' ), array( 'last_used_at' => NomadSA_DB::now() ), array( 'id' => $row['id'] ) );
@@ -418,15 +480,16 @@ class NomadSA_OAuth {
 		return true;
 	}
 
-	public static function can_fix() {
-		return in_array( 'fix', self::$current_scope, true ) && NomadSA_Settings::fixes_active();
+	private static function is_auditor( $user_id ) {
+		$user = get_user_by( 'id', (int) $user_id );
+		return $user && user_can( $user, 'manage_options' );
 	}
 
 	/** Lists apps with active tokens for the settings page. */
 	public static function connections() {
 		global $wpdb;
 		return $wpdb->get_results( $wpdb->prepare(
-			'SELECT client_id, user_id, MAX(scope) AS scope, MIN(created_at) AS first_seen, MAX(COALESCE(last_used_at, created_at)) AS last_used
+			'SELECT client_id, user_id, MIN(created_at) AS first_seen, MAX(COALESCE(last_used_at, created_at)) AS last_used
 			 FROM %i WHERE revoked = 0 AND expires_at > %s GROUP BY client_id, user_id ORDER BY last_used DESC',
 			NomadSA_DB::table( 'tokens' ), NomadSA_DB::now()
 		), ARRAY_A );

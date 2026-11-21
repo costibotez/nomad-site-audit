@@ -24,17 +24,19 @@ class NomadSA_MCP {
 			);
 		}
 
-		$raw = file_get_contents( 'php://input' );
-		$msg = json_decode( (string) $raw, true );
-		if ( ! is_array( $msg ) ) {
+		$msg = NomadSA_HTTP::json_body();
+		if ( null === $msg ) {
 			NomadSA_HTTP::json( self::error( null, -32700, 'Parse error.' ), 400 );
 		}
 
 		// Batches are no longer part of the protocol, but answering them costs nothing.
-		if ( array_keys( $msg ) === range( 0, count( $msg ) - 1 ) ) {
+		if ( is_array( $msg ) ) {
+			if ( empty( $msg ) || count( $msg ) > 20 ) {
+				NomadSA_HTTP::json( self::error( null, -32600, 'Invalid request batch.' ), 400 );
+			}
 			$out = array();
 			foreach ( $msg as $m ) {
-				$r = self::dispatch( is_array( $m ) ? $m : array() );
+				$r = self::dispatch( $m );
 				if ( null !== $r ) {
 					$out[] = $r;
 				}
@@ -57,11 +59,22 @@ class NomadSA_MCP {
 		exit;
 	}
 
-	private static function dispatch( array $msg ) {
-		$id     = $msg['id'] ?? null;
-		$method = (string) ( $msg['method'] ?? '' );
-		$params = isset( $msg['params'] ) && is_array( $msg['params'] ) ? $msg['params'] : array();
-		$is_notification = ! array_key_exists( 'id', $msg );
+	private static function dispatch( $msg ) {
+		if ( ! $msg instanceof stdClass || ( $msg->jsonrpc ?? '' ) !== '2.0'
+			|| ! is_string( $msg->method ?? null ) || strlen( $msg->method ) > 100 ) {
+			return self::error( null, -32600, 'Invalid JSON-RPC request.' );
+		}
+		$id = $msg->id ?? null;
+		if ( null !== $id && ! is_int( $id ) && ! is_float( $id )
+			&& ( ! is_string( $id ) || strlen( $id ) > 200 ) ) {
+			return self::error( null, -32600, 'Invalid request ID.' );
+		}
+		$method = $msg->method;
+		$params = $msg->params ?? new stdClass();
+		if ( ! $params instanceof stdClass ) {
+			return self::error( $id, -32602, 'Parameters must be an object.' );
+		}
+		$is_notification = ! property_exists( $msg, 'id' );
 
 		if ( $is_notification ) {
 			return null; // notifications/initialized, notifications/cancelled and similar need no answer.
@@ -69,7 +82,7 @@ class NomadSA_MCP {
 
 		switch ( $method ) {
 			case 'initialize':
-				$asked   = (string) ( $params['protocolVersion'] ?? '' );
+				$asked   = $params->protocolVersion ?? '';
 				$version = in_array( $asked, self::SUPPORTED_VERSIONS, true ) ? $asked : self::SUPPORTED_VERSIONS[0];
 				return self::result( $id, array(
 					'protocolVersion' => $version,
@@ -89,9 +102,12 @@ class NomadSA_MCP {
 				return self::result( $id, array( 'tools' => NomadSA_Tools::list_for_client() ) );
 
 			case 'tools/call':
-				$name = (string) ( $params['name'] ?? '' );
-				$args = isset( $params['arguments'] ) && is_array( $params['arguments'] ) ? $params['arguments'] : array();
-				return self::result( $id, NomadSA_Tools::call( $name, $args ) );
+				$name = $params->name ?? '';
+				$args = $params->arguments ?? new stdClass();
+				if ( ! is_string( $name ) || ! preg_match( '/^[a-z][a-z0-9_]{0,99}$/D', $name ) || ! $args instanceof stdClass ) {
+					return self::error( $id, -32602, 'A tool name and an arguments object are required.' );
+				}
+				return self::result( $id, NomadSA_Tools::call( $name, get_object_vars( $args ) ) );
 
 			case 'resources/list':
 				return self::result( $id, array( 'resources' => array() ) );
@@ -100,20 +116,12 @@ class NomadSA_MCP {
 				return self::result( $id, array( 'prompts' => array() ) );
 		}
 
-		return self::error( $id, -32601, 'Method not found: ' . $method );
+		return self::error( $id, -32601, 'Method not found.' );
 	}
 
 	private static function instructions() {
-		$text = 'This server audits the WordPress site ' . home_url() . '. Start with site_overview, then security_audit and seo_audit. '
-			. 'Explain findings to the site owner in plain language.';
-		if ( NomadSA_OAuth::can_fix() ) {
-			$text .= ' Fix tools change the live site. Always call a fix tool first without confirm to get a preview, show the preview to the user, '
-				. 'and only call it again with confirm set to true after the user clearly approves that specific change. '
-				. 'Suggest a full site backup before updates.';
-		} else {
-			$text .= ' This connection can only audit; fixes are not allowed.';
-		}
-		return $text;
+		return 'This read-only connector audits the WordPress site ' . home_url() . '. Start with site_overview, then security_audit and seo_audit. '
+			. 'Explain findings in plain language and point the site owner to the relevant WordPress dashboard or hosting settings for changes.';
 	}
 
 	private static function result( $id, $result ) {

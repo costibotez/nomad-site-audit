@@ -2,7 +2,7 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Applies the fixes stored by the connector on every request: security headers, hardening and custom CSS.
+ * Preserves supported hardening preferences from earlier versions.
  */
 class NomadSA_Runtime {
 
@@ -61,13 +61,6 @@ class NomadSA_Runtime {
 			}, 10, 2 );
 		}
 
-		if ( $r['remove_core_info_files'] ) {
-			add_action( '_core_updated_successfully', array( __CLASS__, 'remove_core_info_files' ) );
-		}
-
-		if ( '' !== trim( (string) $r['custom_css'] ) ) {
-			add_action( 'wp_head', array( __CLASS__, 'print_custom_css' ), 999 );
-		}
 	}
 
 	public static function send_security_headers() {
@@ -75,28 +68,13 @@ class NomadSA_Runtime {
 			return;
 		}
 		foreach ( (array) NomadSA_Settings::runtime( 'security_headers' ) as $name => $value ) {
-			if ( 'Strict-Transport-Security' === $name && ! is_ssl() ) {
+			if ( ! in_array( $name, array( 'Strict-Transport-Security', 'X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Permissions-Policy', 'Content-Security-Policy' ), true )
+				|| ! is_string( $value ) || preg_match( '/[[:cntrl:]]/', $value )
+				|| ( 'Strict-Transport-Security' === $name && ! is_ssl() ) ) {
 				continue;
 			}
 			header( $name . ': ' . $value );
 		}
 	}
 
-	public static function print_custom_css() {
-		// CSS cannot go through esc_html (it would break selectors such as a > b); tags are stripped instead.
-		echo "\n<style id=\"nomadsa-custom-css\">\n" . wp_strip_all_tags( (string) NomadSA_Settings::runtime( 'custom_css' ) ) . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-	}
-
-	public static function remove_core_info_files() {
-		$deleted = array();
-		foreach ( array( 'readme.html', 'license.txt' ) as $f ) {
-			if ( file_exists( ABSPATH . $f ) ) {
-				wp_delete_file( ABSPATH . $f );
-				if ( ! file_exists( ABSPATH . $f ) ) {
-					$deleted[] = $f;
-				}
-			}
-		}
-		return $deleted;
-	}
 }
