@@ -16,6 +16,8 @@ Nomad Site Audit connects WordPress to Codex or Claude over the Model Context Pr
 
 It was built for freelancers, agencies and site owners who look after WordPress sites month after month and want the routine checks done faster and explained better.
 
+Nomad Site Audit is developed and maintained by Costin Botez. You can reach the author at contact@nomad-developer.co.uk.
+
 = Security audit =
 
 * Security checks with a plain explanation of each result, covering updates, inactive plugins and unused themes, PHP version, HTTPS and SSL certificate expiry, debug settings, a public error log, the dashboard code editor, wp-config.php permissions, PHP files in uploads, folder browsing, easy to guess usernames, administrator count, open registration, username listing, XML-RPC, browser security headers and version disclosure

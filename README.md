@@ -27,6 +27,7 @@
 
 <p align="center">
   Author: <a href="https://www.nomad-developer.co.uk/">Costin Botez</a> (<a href="https://www.instagram.com/costinbotez/">@costinbotez</a>) ·
+  <a href="mailto:contact@nomad-developer.co.uk">contact@nomad-developer.co.uk</a> ·
   <a href="https://www.nomad-developer.co.uk/">Portfolio</a> ·
   <a href="https://www.instagram.com/costinbotez/">Instagram</a> ·
   <a href="https://github.com/costibotez">GitHub</a>
