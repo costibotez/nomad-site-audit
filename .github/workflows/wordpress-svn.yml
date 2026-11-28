@@ -1,0 +1,37 @@
+name: Publish to WordPress.org SVN
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-org-svn
+  queue: max
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Install Subversion if needed
+        run: |
+          if ! command -v svn >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y subversion
+          fi
+
+      - name: Sync plugin and listing assets
+        env:
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: python3 .github/scripts/deploy-wordpress.py

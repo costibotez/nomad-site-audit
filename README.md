@@ -125,6 +125,16 @@ Audit data stays in the WordPress database. The plugin retains the 52 latest aud
 
 Requires WordPress 6.2+ and PHP 7.4+. The plugin serves a Streamable HTTP MCP endpoint at `/nsa-mcp`, with OAuth endpoints under `/nsa-oauth` and namespaced discovery under `/.well-known/`. There is no build step.
 
+### Publishing to WordPress.org
+
+Add the WordPress.org SVN-specific password for `costibotez` as the `SVN_PASSWORD` GitHub Actions repository secret. [WordPress.org SVN password](https://profiles.wordpress.org/me/profile/edit/group/3/?screen=svn-password) · [GitHub Actions secrets](https://github.com/costibotez/nomad-site-audit/settings/secrets/actions)
+
+Each push to `main` queues the **Publish to WordPress.org SVN** workflow. It syncs the plugin to SVN `trunk` and sends listing images from `.wordpress-org` to the top-level SVN `assets` folder.
+
+The first sync creates the `1.2.0` release tag. To release code changes later, increment the plugin header and `NOMADSA_VERSION` in `nomad-site-audit.php` and the Stable tag in `readme.txt`. The workflow creates the matching release tag. Readme changes are also copied to the current release tag when its plugin files match. [WordPress.org SVN guide](https://developer.wordpress.org/plugins/wordpress-org/how-to-use-subversion/)
+
+If the password is added after a merge, run **Publish to WordPress.org SVN** manually from the repository’s Actions tab.
+
 ## Reporting a security issue
 
 Please do not open a public issue for security problems. Email [contact@nomad-developer.co.uk](mailto:contact@nomad-developer.co.uk) with the details and I will reply within 2 working days.
