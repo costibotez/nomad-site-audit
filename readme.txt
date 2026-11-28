@@ -8,52 +8,37 @@ Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect WordPress to Codex or Claude for read-only security, search and site health audits.
+Audit WordPress security, SEO, and site health. Compare findings over time and optionally connect Codex or Claude.
 
 == Description ==
 
-Nomad Site Audit connects WordPress to Codex or Claude over the Model Context Protocol (MCP). The client can check the live site, explain what it finds and guide you to the WordPress or hosting settings where you can apply recommendations.
+Nomad Site Audit brings security, SEO, and site health checks into your WordPress dashboard. Capture a baseline before maintenance, compare findings after updates, and use the remediation checklist to verify changes. Share the results with a client or team in a branded report.
 
-It was built for freelancers, agencies and site owners who look after WordPress sites month after month and want the routine checks done faster and explained better.
+Run audits and set up monitoring directly in WordPress. To explore your site's audit data from a chat, optionally connect Codex or Claude through the Model Context Protocol (MCP). Each connection requires approval from a WordPress administrator and grants read-only access to the audit tools.
 
-Nomad Site Audit is developed and maintained by Costin Botez. You can reach the author at contact@nomad-developer.co.uk.
+= Audit your site =
 
-= Security audit =
+* **Security** checks cover software updates, HTTPS, certificate expiry, debug settings, public file exposure, and administrator accounts. Scan for signs of malware and verify WordPress core and supported plugins against official checksums. Known vulnerability lookups are available with an optional WPScan API token.
+* **SEO** checks cover search visibility, sitemaps, robots.txt, titles, meta descriptions, headings, image alt text, and broken links. The audit reads metadata from Yoast SEO and Rank Math when available.
+* **Site health** checks cover installed plugins and themes, scheduled tasks, and database metrics such as autoloaded options and revisions. The read-only connector can also inspect supported files and error logs, with recognised secret patterns redacted.
 
-* Security checks with a plain explanation of each result, covering updates, inactive plugins and unused themes, PHP version, HTTPS and SSL certificate expiry, debug settings, a public error log, the dashboard code editor, wp-config.php permissions, PHP files in uploads, folder browsing, easy to guess usernames, administrator count, open registration, username listing, XML-RPC, browser security headers and version disclosure
-* Malware scan for obfuscated code, web shells, encoded blobs, remote includes, PHP hidden in images and recently changed PHP files
-* File verification against official WordPress.org checksums for WordPress itself and for plugins hosted on WordPress.org
-* Optional known vulnerability checks for plugins with a WPScan token
+= Track findings and performance =
 
-= Search and speed =
+* Save audit snapshots and pin a baseline to see which findings are new, recurring, worsened, resolved, or unverified.
+* Use the remediation checklist to open the relevant WordPress screen, track progress, and recheck a finding after making changes.
+* Export a branded HTML report or print it to PDF from the report preview.
+* Enable weekly email digests for high-priority findings and regressions.
+* Monitor up to five public pages daily for response time, HTML size, and HTTP status. Add a Chrome UX Report API key to include mobile Core Web Vitals where field data is available.
 
-* Search optimisation audit: indexing, sitemap, robots.txt, permalinks, search titles, meta descriptions, noindex, main headings, internal links, image alt text and duplicates. Works with Yoast SEO and Rank Math
-* Page check: response time, size, title, description, canonical, headings, images, structured data, render blocking scripts, loading screens, mixed content and response headers
-* Broken link finder, including Elementor pages
+Open **Tools → Nomad Site Audit** to run an audit and configure monitoring. A snapshot covers security, database health, site-wide SEO, and SEO checks on up to 100 of the newest published posts and pages. Scheduled audits and monitoring use WordPress Cron.
 
-= Site health and code review =
+= Control connector access =
 
-* Site overview, database health, scheduled tasks, error log and users
-* Read only file browsing, file reading and code search for reviewing themes and plugins
+* Open a 15-minute window to approve a new connection in WordPress.
+* Review activity, disconnect individual apps, or disable connector access from **Settings → Nomad Site Audit**.
+* OAuth uses PKCE, hashed tokens, and refresh token rotation. File inspection blocks common sensitive configuration and backup paths, and the activity log records tool names and outcomes.
 
-= Audit history and monitoring =
-
-* Save manual audit snapshots and pin a baseline to see new, worsened, recurring, resolved, or unverified findings.
-* Follow the remediation checklist to the relevant WordPress screen and recheck findings after making changes.
-* Download a standalone branded HTML report or preview it and print it to PDF in your browser.
-* Enable weekly audit digests for high-priority findings and regressions.
-* Monitor up to five public pages daily for response time, HTML size and HTTP status. Optional Chrome UX Report data adds mobile Core Web Vitals (LCP, INP, CLS).
-
-Open Tools, Nomad Site Audit to run your first audit and configure reports, digests, and monitoring. Snapshots cover security, site-wide SEO, SEO checks on the 100 newest published posts and pages, and database health. The plugin retains 52 recent snapshots plus the pinned baseline and 90 performance samples. Scheduled jobs depend on WordPress Cron.
-
-= Connection controls =
-
-* An administrator opens a 15-minute window and approves each new connection.
-* The connector grants read-only audit access. Administrators can disconnect individual clients or switch off all access from WordPress.
-* OAuth uses PKCE, hashed tokens and refresh token rotation. The activity log records completed audits and errors without storing tool arguments.
-* File inspection blocks protected paths such as wp-config.php, .env files, private keys, common backup archives and version control folders. It redacts recognised secret patterns from file excerpts and logs. Review what you choose to share with your client.
-
-Codex and Claude are products of OpenAI and Anthropic respectively. Nomad Site Audit is an independent project.
+Nomad Site Audit is developed and maintained by Costin Botez. For author inquiries, email contact@nomad-developer.co.uk.
 
 == External services ==
 
@@ -99,15 +84,23 @@ Only used if you save a Chrome UX Report API key in the audit settings. The plug
 
 == Installation ==
 
-1. Install and activate the plugin from the WordPress Plugins screen.
-2. Open Settings, Nomad Site Audit. Copy the connection address and use Test discovery to check that your host routes the OAuth metadata URL to WordPress.
-3. Click Allow a new connection just before connecting from your client.
-4. In Codex, add a Streamable HTTP MCP server with the copied URL. From the CLI, run `codex mcp add nomad-site-audit --url https://example.com/nsa-mcp`, using the address from your site. If prompted to authenticate separately, run `codex mcp login nomad-site-audit`. In Claude, open Settings, Connectors, Add custom connector and paste the same URL.
-5. Sign in to WordPress and click Allow. Open a new connection window for each additional client.
+1. In WordPress, open **Plugins → Add New**, search for **Nomad Site Audit**, and install and activate it.
+2. Open **Tools → Nomad Site Audit** and select **Run audit**. Use **Audit settings** to configure reports, digests, and performance monitoring.
 
-Use HTTPS and pretty permalinks. Keep 127.0.0.1 and localhost in Allowed callback hosts for the default Codex OAuth flow.
+= Optional setup for Codex or Claude =
+
+1. Open **Settings → Nomad Site Audit**. Copy the connector URL and use **Test discovery** to check that your host routes the OAuth metadata URL to WordPress.
+2. Select **Allow a new connection** before starting sign-in from your client.
+3. In Codex, add a Streamable HTTP MCP server with the copied URL. From the CLI, run `codex mcp add nomad-site-audit --url https://example.com/nsa-mcp` using your site's URL. If prompted, run `codex mcp login nomad-site-audit`. In Claude, go to **Settings → Connectors → Add custom connector** and paste your connector URL.
+4. Sign in to WordPress and select **Allow**. Open a new connection window for each additional client.
+
+Use HTTPS on public sites and enable pretty permalinks for the connector. Keep `127.0.0.1` and `localhost` in **Allowed callback hosts** for the default Codex OAuth flow.
 
 == Frequently Asked Questions ==
+
+= Do I need Codex or Claude to run an audit? =
+
+You can run audits, review snapshots, recheck findings, download reports, and monitor performance from your WordPress dashboard. The connector is optional.
 
 = Can the connector change my site? =
 

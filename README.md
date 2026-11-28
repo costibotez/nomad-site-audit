@@ -1,11 +1,11 @@
 <h1 align="center">Nomad Site Audit</h1>
 
 <p align="center">
-  <strong>Audit your WordPress site from Codex or Claude.</strong>
+  <strong>Audit WordPress security, SEO, and site health.</strong>
 </p>
 
 <p align="center">
-  A free WordPress plugin that connects your site to Codex or Claude for read-only security, search and site health audits.
+  Track findings and performance in WordPress, with optional read-only access from Codex or Claude.
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="#-quick-start-under-5-minutes">Quick start</a> ·
+  <a href="#quick-start">Quick start</a> ·
   <a href="#what-the-plugin-includes">Features</a> ·
   <a href="#connection-controls">Connection controls</a> ·
   <a href="#example-prompts">Example prompts</a> ·
@@ -37,7 +37,7 @@
 
 ## Why Nomad Site Audit exists
 
-Nomad Site Audit gives Codex and Claude access to WordPress audit data so you can investigate site health, SEO and performance from a chat. The client can explain what it finds and point you to the WordPress or hosting controls where you can make changes.
+Nomad Site Audit gives site owners, developers, and agencies a WordPress dashboard for checking security, SEO, and site health. Use snapshots to see what changed, recheck findings after making improvements, and share the results in a branded report. Connect Codex or Claude when you want to explore audit data from a chat.
 
 ## What the plugin includes
 
@@ -65,12 +65,16 @@ Nomad Site Audit gives Codex and Claude access to WordPress audit data so you ca
 - OAuth uses PKCE, hashed tokens and refresh token rotation. New activity log entries record tool names and outcomes without storing arguments.
 - The connector blocks protected configuration files and common backup formats and redacts recognised secret patterns in file excerpts and logs.
 
-## ⚡ Quick start (under 5 minutes)
+## Quick start
 
-1. Upload the plugin under **Plugins → Add New → Upload Plugin** and activate it.
-2. Open **Settings → Nomad Site Audit** and copy the connection address ending in `/nsa-mcp`. Click **Test discovery** to verify OAuth discovery.
-3. Click **Allow a new connection** just before connecting from your client.
-4. Follow the instructions for Codex or Claude. Sign in to WordPress when prompted and click **Allow**. Open a new connection window for each client you add.
+1. Find and activate **Nomad Site Audit** under **Plugins → Add New**.
+2. Open **Tools → Nomad Site Audit** and select **Run audit**.
+
+### Optional connector setup
+
+1. Open **Settings → Nomad Site Audit** and copy the address ending in `/nsa-mcp`. Select **Test discovery** to verify OAuth discovery.
+2. Select **Allow a new connection** before connecting from Codex or Claude.
+3. Sign in to WordPress when prompted and select **Allow**. Open a new connection window for each client you add.
 
 ### Codex
 
